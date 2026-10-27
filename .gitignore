@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# Secrets - never commit (use .env.example as the template)
+.env
+.env.*
+!.env.example
+
+# Generated output
+eval/results/
+report.json

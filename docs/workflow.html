@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>factcheck workflow</title>
+<style>
+  :root { --bg:#ffffff; --fg:#1d1d1f; --muted:#555; --line:#ddd; --card:#f7f7fa; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#16161a; --fg:#ececf1; --muted:#a0a0aa; --line:#33333a; --card:#1f1f25; } }
+  body { background:var(--bg); color:var(--fg); font:16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+         max-width: 1000px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.8rem; margin-bottom: .2rem; } h2 { margin-top: 2.2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
+  code { background: var(--card); padding: 1px 5px; border-radius: 4px; font-size: .9em; }
+  .diagram { background: var(--card); border:1px solid var(--line); border-radius: 10px; padding: 16px; overflow-x:auto; }
+  table { border-collapse: collapse; width: 100%; font-size: .92rem; } th, td { border:1px solid var(--line); padding:6px 8px; text-align:left; vertical-align:top; }
+  th { background: var(--card); }
+</style>
+</head>
+<body>
+<h1>factcheck: agent workflow</h1>
+<p>How a paragraph becomes a fact-check report. The two LangGraph diagrams (sections 2 and 3) were exported from the compiled graphs in <code>src/factcheck/graph.py</code> with <code>graph.get_graph().draw_mermaid()</code>. Only the edge labels were added by hand. The diagrams render on GitHub, in VS Code with a Mermaid extension, or in <code>docs/workflow.html</code> (open it in a browser).</p>
+<h2>1. End-to-end overview</h2>
+<div class="diagram"><pre class="mermaid">flowchart TD
+    U[&quot;User text&lt;br/&gt;(CLI argument, --file or stdin)&quot;] --&gt; V[&quot;validate_input&lt;br/&gt;length &amp; content limits&quot;]
+    V --&gt; X[&quot;extract_claims&lt;br/&gt;1 LLM call: atomic claims + search queries&quot;]
+    X --&gt; C[&quot;validate_claims&lt;br/&gt;excerpt anchored in input, no invented figures,&lt;br/&gt;dedupe, opinions -&gt; NOT_CHECKABLE, max 6 claims&quot;]
+    C --&gt;|&quot;one Send() per checkable claim&lt;br/&gt;(parallel, max_concurrency = 3)&quot;| W[&quot;claim_worker&lt;br/&gt;per-claim subgraph (section 3)&quot;]
+    C --&gt;|&quot;no checkable claims&quot;| S
+    W --&gt; S[&quot;summarize&lt;br/&gt;merge results in claim order&quot;]
+    S --&gt; R[&quot;render_report&lt;br/&gt;deterministic overall label&quot;]
+    R --&gt; T[&quot;Terminal report&lt;br/&gt;(normal / -v verbose)&quot;]
+    R --&gt; J[&quot;--json-out report.json&lt;br/&gt;(complete structured data)&quot;]
+
+    subgraph EXT [&quot;External services&quot;]
+        G[&quot;Gemini (primary LLM)&quot;]
+        O[&quot;Ollama qwen3:4b (local fallback LLM)&quot;]
+        TV[&quot;Tavily (web search + page extraction)&quot;]
+    end
+    X -.-&gt; G
+    W -.-&gt; G
+    W -.-&gt; TV
+    G -.-&gt;|&quot;recoverable failure:&lt;br/&gt;429 / 5xx / timeout / network&quot;| O</pre></div>
+<h2>2. Main graph (LangGraph <code>build_graph</code>)</h2>
+<div class="diagram"><pre class="mermaid">flowchart TD
+    start([start]) --&gt; validate_input
+    validate_input --&gt; extract_claims
+    extract_claims --&gt; validate_claims
+    validate_claims -.-&gt;|&quot;Send per checkable claim&quot;| claim_worker
+    validate_claims -.-&gt;|&quot;nothing to check&quot;| summarize
+    claim_worker --&gt; summarize
+    summarize --&gt; render_report
+    render_report --&gt; finish([end])</pre></div>
+<h2>3. Per-claim subgraph (LangGraph <code>build_claim_graph</code>)</h2>
+<div class="diagram"><pre class="mermaid">flowchart TD
+    start([start]) --&gt; retrieve
+    retrieve[&quot;retrieve&lt;br/&gt;Tavily: up to 2 queries x 5 results,&lt;br/&gt;extract top 5 pages (credit budget)&quot;] --&gt; process_evidence
+    process_evidence[&quot;process_evidence&lt;br/&gt;sanitise, chunk &lt;= 1200 chars, rank,&lt;br/&gt;dedupe URLs, cluster sources, assign evidence IDs&quot;] --&gt; sufficiency_gate
+    sufficiency_gate{&quot;sufficiency_gate&quot;}
+    sufficiency_gate -.-&gt;|&quot;weak evidence and fallback round unused&lt;br/&gt;(at most 1 extra round)&quot;| retrieve
+    sufficiency_gate -.-&gt;|&quot;enough passages&quot;| judge
+    sufficiency_gate -.-&gt;|&quot;all searches failed -&gt; RETRIEVAL_FAILED&lt;br/&gt;no relevant passages -&gt; INSUFFICIENT_EVIDENCE&lt;br/&gt;budget / deadline -&gt; PROCESSING_FAILED&quot;| finalize
+    judge[&quot;judge&lt;br/&gt;1 LLM call: stance + verbatim quote per passage&lt;br/&gt;(untrusted content delimited, no tools)&quot;] --&gt; validate_judgment
+    validate_judgment{&quot;validate_judgment&lt;br/&gt;IDs exist, quotes verbatim, on-topic,&lt;br/&gt;figures present, numeric comparisons&quot;}
+    validate_judgment -.-&gt;|&quot;malformed / fabricated citations&lt;br/&gt;(at most 1 repair)&quot;| judge
+    validate_judgment -.-&gt;|&quot;valid, or still invalid -&gt; PROCESSING_FAILED&quot;| finalize
+    finalize[&quot;finalize&lt;br/&gt;deterministic verdict + correction check + evidence-strength score&quot;] --&gt; finish([end])</pre></div>
+<h3>Deterministic verdict rules (inside <code>finalize</code>)</h3>
+<div class="diagram"><pre class="mermaid">flowchart TD
+    A[&quot;Validated citations only&lt;br/&gt;S = support, R = refutation, M = missing context&lt;br/&gt;(noisy-OR over independent source clusters)&quot;] --&gt; B{&quot;S &gt;= 0.5 and R &gt;= 0.5?&quot;}
+    B --&gt;|yes| CF[CONFLICTING]
+    B --&gt;|no| C{&quot;R &gt;= 0.5?&quot;}
+    C --&gt;|yes| RF[REFUTED]
+    C --&gt;|no| D{&quot;S &gt;= 0.5 and M &gt;= 0.5?&quot;}
+    D --&gt;|yes| ML[MISLEADING]
+    D --&gt;|no| E{&quot;S &gt;= 0.5?&quot;}
+    E --&gt;|yes| SP[SUPPORTED]
+    E --&gt;|no| IE[INSUFFICIENT_EVIDENCE]</pre></div>
+<p>The model&#x27;s own proposed verdict is recorded, but it never decides the outcome.</p>
+<h2>4. LLM provider chain and fallback (<code>llm.FallbackLLM</code>)</h2>
+<div class="diagram"><pre class="mermaid">flowchart TD
+    Q[&quot;LLM request&lt;br/&gt;(extract_claims or judge)&quot;] --&gt; BUD{&quot;Run deadline left and&lt;br/&gt;LLM call budget available?&quot;}
+    BUD --&gt;|no| FAIL1[&quot;LLMUnavailable -&gt; claim PROCESSING_FAILED&lt;br/&gt;(extraction: run failure, exit 3)&quot;]
+    BUD --&gt;|yes| DOWN{&quot;Gemini already marked&lt;br/&gt;unavailable this run?&quot;}
+    DOWN --&gt;|no| GEM[&quot;Gemini&lt;br/&gt;JSON schema, bounded retries (429/5xx/connect)&quot;]
+    DOWN --&gt;|yes| OLL
+    GEM --&gt;|success| OK[&quot;Structured output -&gt; Pydantic + validation&quot;]
+    GEM --&gt;|&quot;auth / model access / other 4xx&quot;| STOP[&quot;Stop run (exit 3)&lt;br/&gt;no fallback for bad credentials&quot;]
+    GEM --&gt;|&quot;malformed output&quot;| REP[&quot;Graph repair path (max 1)&quot;]
+    GEM --&gt;|&quot;recoverable: 429, 5xx, timeout, network&quot;| MARK[&quot;Mark Gemini unavailable for this run&quot;]
+    MARK --&gt; OLL[&quot;Ollama /api/chat&lt;br/&gt;format = JSON schema, think = false,&lt;br/&gt;one request at a time, deadline-clipped&quot;]
+    OLL --&gt;|success| OK
+    OLL --&gt;|&quot;server down / model missing /&lt;br/&gt;timeout / invalid output&quot;| FAIL2[&quot;Combined error naming both providers&quot;]</pre></div>
+<h2>Step reference</h2>
+<table><thead><tr><th>Step</th><th>Kind</th><th>What it does</th><th>Limits</th></tr></thead><tbody><tr><td><code>validate_input</code></td><td>code</td><td>Cleans control and bidi characters; rejects empty or too-long input</td><td>4,000 characters</td></tr><tr><td><code>extract_claims</code></td><td>LLM</td><td>Splits text into atomic claims with exact excerpts and search queries</td><td>1 call (+1 retry if malformed)</td></tr><tr><td><code>validate_claims</code></td><td>code</td><td>Drops claims with invented excerpts or figures, instructions and duplicates; marks opinions and predictions NOT_CHECKABLE</td><td>max 6 checkable claims</td></tr><tr><td><code>claim_worker</code></td><td>graph</td><td>Runs the per-claim subgraph for each claim in parallel</td><td>concurrency 3, recursion limit 25</td></tr><tr><td><code>retrieve</code></td><td>Tavily</td><td>Searches (and one fallback round with other queries if evidence is weak); extracts full pages</td><td>40 credits per run</td></tr><tr><td><code>process_evidence</code></td><td>code</td><td>Sanitises and chunks; ranks; canonical URL dedupe; independence clusters; evidence IDs</td><td>8 passages per claim</td></tr><tr><td><code>sufficiency_gate</code></td><td>code</td><td>Chooses fallback round, judge or finish; separates technical failure from no evidence</td><td>—</td></tr><tr><td><code>judge</code></td><td>LLM</td><td>Assesses each passage: stance, directness, verbatim quote, numeric comparison</td><td>1 call (+1 repair)</td></tr><tr><td><code>validate_judgment</code></td><td>code</td><td>Rejects unknown IDs, non-verbatim or off-topic quotes, missing figures, mismatched measurements</td><td>—</td></tr><tr><td><code>finalize</code></td><td>code</td><td>Verdict rules, grounded correction, 0–100 evidence-strength score with caps</td><td>—</td></tr><tr><td><code>summarize</code> / <code>render_report</code></td><td>code</td><td>Overall label, terminal report, JSON</td><td>—</td></tr></tbody></table>
+<p>Every run is bounded by a 180 s deadline, a 14-call LLM budget, a 40-credit search budget and a single fallback/repair per claim. Each limit stops work cleanly and marks unfinished claims <code>PROCESSING_FAILED</code>.</p>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.esm.min.mjs";
+  const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "default", securityLevel: "strict" });
+</script>
+</body>
+</html>

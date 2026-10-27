@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "factcheck"
+version = "0.1.0"
+description = "Evidence-grounded fact-checking CLI built with LangGraph, Gemini and Tavily (college project)."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "langgraph>=1.0,<2",
+    "pydantic>=2.7,<3",
+    "google-genai>=1.30",
+    "tavily-python>=0.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[project.scripts]
+factcheck = "factcheck.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "live: makes real Gemini/Tavily calls; skipped unless FACTCHECK_LIVE_TESTS=1 and keys are set",
+]
