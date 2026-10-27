@@ -1,0 +1,700 @@
+{
+  "input_kind": "image",
+  "extraction": {
+    "image": "C:\\Users\\ASUS\\Downloads\\Gemini_Generated_Image_xxobb3xxobb3xxob.png",
+    "width": 3008,
+    "height": 1376,
+    "engine": "rapid",
+    "layout": "geometric",
+    "text": "Bombay Cat\nLike a panther in miniature, the Bombay is an elegant yet\nstrong cat that's curious, active, and highly affectionate.\nThey love spending time with their owners and can be\nvery social with other people too. As extroverted as dogs,\nthe Bombay cat breed is perfect for even first-time\nowners!\n\nLifespan\n\n40 - 50 years\n\nWeight\n\n3.6- 6.8kg\n\n1 of 3\n\nOD Colours\nJet-black coat that has the gloss and shine of patent leather",
+    "quality": {
+      "status": "OK",
+      "threshold": 0.8,
+      "lines": [
+        {
+          "line_no": 1,
+          "block_no": 1,
+          "text": "Bombay Cat",
+          "score": 0.9962,
+          "bbox": [
+            306.258056640625,
+            209.0689697265625,
+            821.741943359375,
+            308.4137878417969
+          ],
+          "reliable": true
+        },
+        {
+          "line_no": 2,
+          "block_no": 1,
+          "text": "Like a panther in miniature, the Bombay is an elegant yet",
+          "score": 0.9962,
+          "bbox": [
+            310.80645751953125,
+            336.5862121582031,
+            1223.51611328125,
+            381.0689697265625
+          ],
+          "reliable": true
+        },
+        {
+          "line_no": 3,
+          "block_no": 1,
+          "text": "strong cat that's curious, active, and highly affectionate.",
+          "score": 0.9986,
+          "bbox": [
+            310.80645751953125,
+            389.96551513671875,
+            1206.8387451171875,
+            432.96551513671875
+          ],
+          "reliable": true
+        },
+        {
+          "line_no": 4,
+          "block_no": 1,
+          "text": "They love spending time with their owners and can be",
+          "score": 0.9996,
+          "bbox": [
+            312.32257080078125,
+            440.3793029785156,
+            1185.6129150390625,
+            484.862060546875
+          ],
+          "reliable": true
+        },
+        {
+          "line_no": 5,
+          "block_no": 1,
+          "text": "very social with other people too. As extroverted as dogs,",
+          "score": 0.9905,
+          "bbox": [
+            310.80645751953125,
+            492.27587890625,
+            1235.6451416015625,
+            536.7586059570312
+          ],
+          "reliable": true
+        },
+        {
+          "line_no": 6,
+          "block_no": 1,
+          "text": "the Bombay cat breed is perfect for even first-time",
+          "score": 0.9984,
+          "bbox": [
+            309.2903137207031,
+            542.6896362304688,
+            1126.48388671875,
+            587.1724243164062
+          ],
+          "reliable": true
+        },
+        {
+          "line_no": 7,
+          "block_no": 1,
+          "text": "owners!",
+          "score": 1.0,
+          "bbox": [
+            309.2903137207031,
+            594.5862426757812,
+            448.7742004394531,
+            636.1034545898438
+          ],
+          "reliable": true
+        },
+        {
+          "line_no": 8,
+          "block_no": 2,
+          "text": "Lifespan",
+          "score": 1.0,
+          "bbox": [
+            544.2903442382812,
+            1193.6207275390625,
+            733.8064575195312,
+            1254.413818359375
+          ],
+          "reliable": true
+        },
+        {
+          "line_no": 9,
+          "block_no": 3,
+          "text": "40 - 50 years",
+          "score": 0.9597,
+          "bbox": [
+            410.8709716796875,
+            1300.3792724609375,
+            638.2903442382812,
+            1349.310302734375
+          ],
+          "reliable": true
+        },
+        {
+          "line_no": 10,
+          "block_no": 4,
+          "text": "Weight",
+          "score": 1.0,
+          "bbox": [
+            1152.258056640625,
+            1190.6551513671875,
+            1316.0,
+            1255.8966064453125
+          ],
+          "reliable": true
+        },
+        {
+          "line_no": 11,
+          "block_no": 5,
+          "text": "3.6- 6.8kg",
+          "score": 0.9574,
+          "bbox": [
+            1020.3548583984375,
+            1300.3792724609375,
+            1205.322509765625,
+            1350.7930908203125
+          ],
+          "reliable": true
+        },
+        {
+          "line_no": 12,
+          "block_no": 6,
+          "text": "1 of 3",
+          "score": 0.9564,
+          "bbox": [
+            2588.0322265625,
+            748.7930908203125,
+            2662.322509765625,
+            787.3448486328125
+          ],
+          "reliable": true
+        },
+        {
+          "line_no": 13,
+          "block_no": 7,
+          "text": "OD Colours",
+          "score": 0.8963,
+          "bbox": [
+            1635.9031982421875,
+            1169.8966064453125,
+            1937.6129150390625,
+            1279.6207275390625
+          ],
+          "reliable": true
+        },
+        {
+          "line_no": 14,
+          "block_no": 7,
+          "text": "Jet-black coat that has the gloss and shine of patent leather",
+          "score": 0.9976,
+          "bbox": [
+            1634.3870849609375,
+            1303.3448486328125,
+            2592.58056640625,
+            1346.3448486328125
+          ],
+          "reliable": true
+        }
+      ],
+      "unreliable_lines": 0,
+      "dropped_low_confidence": 0,
+      "min_score": 0.8963,
+      "mean_score": 0.9819,
+      "problems": []
+    },
+    "ocr_seconds": 2.048,
+    "warnings": []
+  },
+  "fact_check": {
+    "input_chars": 427,
+    "summary_label": "CONTAINS_FALSE_CLAIMS",
+    "summary_text": "At least one claim is contradicted by the retrieved evidence. (2 claim(s): 2 refuted.)",
+    "claims": [
+      {
+        "claim_id": "C1",
+        "index": 1,
+        "statement": "The Bombay cat breed has a lifespan of 40 - 50 years",
+        "source_excerpt": "40 - 50 years",
+        "claim_type": "NUMERIC",
+        "checkability": "CHECKABLE",
+        "time_sensitive": false,
+        "verdict": "REFUTED",
+        "rationale": "sufficient evidence directly contradicts the claim",
+        "model_proposed_verdict": "REFUTED",
+        "supporting": [],
+        "refuting": [
+          {
+            "evidence_id": "C1-E2",
+            "url": "https://en.wikipedia.org/wiki/Bombay_cat",
+            "title": "Bombay cat - Wikipedia",
+            "published_date": null,
+            "quote": "A healthy Bombay has an average lifespan of 15 years, and some have been known to live up to 20.",
+            "stance": "REFUTES",
+            "directness": "EXPLICIT",
+            "authority": "SECONDARY",
+            "cluster_id": "C1-K4",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "fact_check_site": false,
+            "recent": null,
+            "weight": 0.75
+          },
+          {
+            "evidence_id": "C1-E1",
+            "url": "https://www.sbrvet.com/site/blog/2024/01/21/cat-breeds-live-longest",
+            "title": "Cat Breeds that Live the Longest, Statesboro Vets",
+            "published_date": "Sun, 21 Jan 2024 00:00:00 GMT",
+            "quote": "Bombay cats have a maximum lifespan of 20 years.",
+            "stance": "REFUTES",
+            "directness": "EXPLICIT",
+            "authority": "OTHER",
+            "cluster_id": "C1-K5",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "fact_check_site": false,
+            "recent": null,
+            "weight": 0.4
+          },
+          {
+            "evidence_id": "C1-E4",
+            "url": "https://realpetage.com/bombay-cat-lifespan",
+            "title": "Bombay Cat Lifespan: 12–16 Years & the Hidden Gene (2026)",
+            "published_date": "Wed, 02 Sep 2026 00:00:00 GMT",
+            "quote": "Bombay cats typically live 12–16 years, and well-cared-for indoor cats sometimes reach their late teens or even 20.",
+            "stance": "REFUTES",
+            "directness": "EXPLICIT",
+            "authority": "OTHER",
+            "cluster_id": "C1-K1",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "fact_check_site": false,
+            "recent": null,
+            "weight": 0.4
+          },
+          {
+            "evidence_id": "C1-E5",
+            "url": "https://realpetage.com/bombay-cat-lifespan",
+            "title": "Bombay Cat Lifespan: 12–16 Years & the Hidden Gene (2026)",
+            "published_date": "Wed, 02 Sep 2026 00:00:00 GMT",
+            "quote": "A 12–16 year lifespan is realistic, and a screened, lean, indoor Bombay can push into its late teens.",
+            "stance": "REFUTES",
+            "directness": "EXPLICIT",
+            "authority": "OTHER",
+            "cluster_id": "C1-K1",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "fact_check_site": false,
+            "recent": null,
+            "weight": 0.4
+          },
+          {
+            "evidence_id": "C1-E6",
+            "url": "https://www.petmd.com/cat/breeds/bombay",
+            "title": "Bombay Cat Breed Health and Care | PetMD",
+            "published_date": "Tue, 02 May 2023 00:00:00 GMT",
+            "quote": "The Bombay is a healthy cat with a typical lifespan of 9–15 years, although they can live as long as 20 years.",
+            "stance": "REFUTES",
+            "directness": "EXPLICIT",
+            "authority": "OTHER",
+            "cluster_id": "C1-K2",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "fact_check_site": false,
+            "recent": null,
+            "weight": 0.4
+          },
+          {
+            "evidence_id": "C1-E7",
+            "url": "https://www.purina.co.uk/find-a-pet/cat-breeds/bombay",
+            "title": "Bombay - Cat Breed Information Guide | Pro Plan",
+            "published_date": null,
+            "quote": "Lifespan 12 - 20 years",
+            "stance": "REFUTES",
+            "directness": "EXPLICIT",
+            "authority": "OTHER",
+            "cluster_id": "C1-K3",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "fact_check_site": false,
+            "recent": null,
+            "weight": 0.4
+          }
+        ],
+        "context": [],
+        "correction": "The Bombay cat breed typically has a lifespan of 12 to 20 years, rather than 40 to 50 years.",
+        "correction_note": "Grounded in C1-E2, C1-E7.",
+        "score": 85,
+        "score_caps": [
+          "capped at 85: no primary-authority source"
+        ],
+        "support_score": null,
+        "refute_score": null,
+        "strengths": {
+          "support": 0.0,
+          "refute": 0.9676,
+          "context": 0.0
+        },
+        "failure_reason": null,
+        "notes": [],
+        "rejected_citations": 0,
+        "evidence": [
+          {
+            "evidence_id": "C1-E1",
+            "url": "https://www.sbrvet.com/site/blog/2024/01/21/cat-breeds-live-longest",
+            "domain": "sbrvet.com",
+            "title": "Cat Breeds that Live the Longest, Statesboro Vets",
+            "published_date": "Sun, 21 Jan 2024 00:00:00 GMT",
+            "text": "Oriental Shorthair Oriental shorthair is a crossbreed using Siamese as the base. Oriental shorthair cats’ appearances are unique and their coats come in 300 colors and patterns. Since they are a cross-breed of Siamese cats, they share the same wonderful personalities as the Siamese: smart, curious, and loving. These cats have a long life expectancy of over 15 years. Russian Blue Russian blue cats have elegant features, long limbs, and slender bodies. Perhaps this explained why this breed appears a lot in TV adverts. Russian blue cats are a gentle cat breed that is easy to train. They are a bit shy around strangers but affectionate with their owners. They enjoy typical indoor life and can live long up to 10-20 years on average. Bombay Bombay cats have beautiful jet-black coats that give them a mysterious appearance. Although the black coat gene is dominant, a sable-colored kitten may occasionally be born. Bombay cats enjoy interacting with people, whether they are children or strangers. Bombay cats are generally intelligent, playful, and attention-seeking. Bombay cats have a maximum lifespan of 20 years.",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "authority": "OTHER",
+            "fact_check_site": false,
+            "cluster_id": "C1-K5",
+            "relevance": 0.642857
+          },
+          {
+            "evidence_id": "C1-E2",
+            "url": "https://en.wikipedia.org/wiki/Bombay_cat",
+            "domain": "en.wikipedia.org",
+            "title": "Bombay cat - Wikipedia",
+            "published_date": null,
+            "text": "The medium-sized ears are wide-set, straight, and rounded at the tips. Eyes: The large, round eyes are set far apart and are always copper-coloured, but can range from bright orange to warm golden. Green eyes are not allowed. Coat: Short, dense and shiny, tight to the body, with a lacquered sheen. Only completely solid black coloured coats are allowed. Weight: For females, the average is 2.5–3.5 kg (6–8 lb). For males, the average is 3.5–5 kg (8–11 lb). Behaviour [edit] The personality of the Bombay tends to be highly social, is marked by strong attachment to families, and is typified by craving attention. As a breed, these characteristics make them highly suitable for children. Domesticated Bombay cats have been noted to thrive as strictly indoor cats, and are able to survive in a single room apartment, so long as all of their needs are met. Anecdotally, many prefer quieter surroundings. Health [edit] A healthy Bombay has an average lifespan of 15 years, and some have been known to live up to 20. They are prone to nasal and sinus problems, and gingivitis. Their food intake should be controlled to avoid overfeeding. References [edit] 1. 1 2 3 4 5 6 7 8 van Zyl, Miezan (2015).",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "authority": "SECONDARY",
+            "fact_check_site": false,
+            "cluster_id": "C1-K4",
+            "relevance": 0.617143
+          },
+          {
+            "evidence_id": "C1-E3",
+            "url": "https://www.sbrvet.com/site/blog/2024/01/21/cat-breeds-live-longest",
+            "domain": "sbrvet.com",
+            "title": "Cat Breeds that Live the Longest, Statesboro Vets",
+            "published_date": "Sun, 21 Jan 2024 00:00:00 GMT",
+            "text": "Without a doubt, Bombay cats make excellent family pets, but they are quite rare and may be difficult to find for adoption. Sphynx Despite their slightly alien appearance and lack of hair, Sphynx cats are quite popular and live for 15 to 20 years on average. They are popular among allergy-prone cat owners because they are hairless. Sphynx cats are extremely sociable and crave attention. They will welcome you home and follow you wherever you go. Because Sphynx cats lack hair, they must be protected from cold in the winter and intense heat in the summer. Persian The average lifespan of this fluffy and adorable Persian cat is 15 to 20 years. They appear calm and quiet, but they are actually friendly and enjoy cuddling with their favorite people. Persian cats, like other cat breeds, are prone to illnesses such as corneal ulcers, tummy problems, diarrhea, and more, so if you own one, make sure to take it to your veterinarian for regular checkups. Grooming is another issue with Persian cats. To prevent matting, you must brush and comb their fur on a daily basis. Though their long fur is beautiful, if the Persian cat sheds excessively, it can make your house a mess.",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "authority": "OTHER",
+            "fact_check_site": false,
+            "cluster_id": "C1-K5",
+            "relevance": 0.605357
+          },
+          {
+            "evidence_id": "C1-E4",
+            "url": "https://realpetage.com/bombay-cat-lifespan",
+            "domain": "realpetage.com",
+            "title": "Bombay Cat Lifespan: 12–16 Years & the Hidden Gene (2026)",
+            "published_date": "Wed, 02 Sep 2026 00:00:00 GMT",
+            "text": "Skip to content RealPetAge Breed spotlight Bombay cat lifespan: how long do these “parlor panthers” live? 12–16 years typically, with indoor cats sometimes reaching their late teens. The patent-leather black 'mini panther' is a healthy breed — with one inherited gene, carried from its Burmese line, that every owner should know about. Sleek black Bombay cat with glossy patent-leather coat and copper eyes looking at the camera 🐾By RealPetAge Editorial Team · See sources → The Bombay looks like a miniature panther and acts like a dog. Bred deliberately to resemble a black leopard in the living room — hence the nickname “parlor panther” — it pairs a glossy, patent-leather black coat and glowing copper eyes with one of the most affectionate, people-following personalities in the cat world. It's also a genuinely healthy breed. The lifespan question comes down to a couple of inherited conditions carried over from its Burmese ancestry, plus the same weight-and-teeth levers that decide every cat's lifespan. Here's the full picture. How long do Bombay cats live? Bombay cats typically live 12–16 years, and well-cared-for indoor cats sometimes reach their late teens or even 20.",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "authority": "OTHER",
+            "fact_check_site": false,
+            "cluster_id": "C1-K1",
+            "relevance": 0.586607
+          },
+          {
+            "evidence_id": "C1-E5",
+            "url": "https://realpetage.com/bombay-cat-lifespan",
+            "domain": "realpetage.com",
+            "title": "Bombay Cat Lifespan: 12–16 Years & the Hidden Gene (2026)",
+            "published_date": "Wed, 02 Sep 2026 00:00:00 GMT",
+            "text": "Here is life expectancy at birth by breed from the 2024 UK VetCompass study (Teng et al.), which measured every breed the same way so they can be compared fairly. These figures count kittens and young cats lost early, so they run lower than the typical adult lifespans breed guides quote. Burmese: 14.42 years Birman: 14.39 years Mixed-breed cats: 11.89 years Siamese: 11.69 years Persian: 10.93 years Ragdoll: 10.31 years Maine Coon: 9.71 years British Shorthair/Longhair: 9.58 years Bengal: 8.51 years Sphynx: 6.68 years Bombay (not in the study): 12–16 years typical, some to 20 (breed guides) For deeper context, see our guides on the closely relatedBritish Shorthair lifespan, Persian cat lifespan, and Maine Coon lifespan, or browse the full longest-living cat breeds ranking. The bottom line The Bombay is a striking, intensely affectionate, and fundamentally healthy cat. A 12–16 year lifespan is realistic, and a screened, lean, indoor Bombay can push into its late teens. The keys are: buy from a breeder who DNA-tests for hypokalemia and the Burmese Head Defect, keep this food-loving “parlor panther” slim, brush its teeth, and add heart screening as it ages.",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "authority": "OTHER",
+            "fact_check_site": false,
+            "cluster_id": "C1-K1",
+            "relevance": 0.586607
+          },
+          {
+            "evidence_id": "C1-E6",
+            "url": "https://www.petmd.com/cat/breeds/bombay",
+            "domain": "petmd.com",
+            "title": "Bombay Cat Breed Health and Care | PetMD",
+            "published_date": "Tue, 02 May 2023 00:00:00 GMT",
+            "text": "It really does not matter what you’re doing, as long as they can be a part of it too.” A Bombay’s grooming needs are minimal, and the breed generally gets along with everyone (including children, strangers, and even the family dog). Bombay Cat Health Issues The Bombay is a healthy cat with a typical lifespan of 9–15 years, although they can live as long as 20 years. While there isn’t evidence of these breeds having specific genetic health issues, Bruce Kornreich, DVM, Ph.D., director of the Cornell Feline Health Center and a clinical cardiologist at the Cornell University Hospital for Animals, says it’s important to pay attention to what reputable breeders say they see frequently in Bombays. This anecdotal evidence, especially for breeds like the Bombay with such a small population, is often what leads to the studies that officially identify those issues. So, he says, anecdotal reports are important. In other words, if your breeder mentions that you should watch for any particular health issues, you would be wise to do so. Valles says that, as Bombays enter their senior years, they may develop issues with their kidneys or pancreas. And, as with all cats, cancer is a possibility.",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "authority": "OTHER",
+            "fact_check_site": false,
+            "cluster_id": "C1-K2",
+            "relevance": 0.586607
+          },
+          {
+            "evidence_id": "C1-E7",
+            "url": "https://www.purina.co.uk/find-a-pet/cat-breeds/bombay",
+            "domain": "purina.co.uk",
+            "title": "Bombay - Cat Breed Information Guide | Pro Plan",
+            "published_date": null,
+            "text": "Home Purina UK Your Pet, Our Passion. Bombay Cat Like a panther in miniature, the Bombay is an elegant yet strong cat that’s curious, active, and highly affectionate. They love spending time with their owners and can be very social with other people too. As extroverted as dogs, the Bombay cat breed is perfect for even first-time owners! Bombay Cat Breed Bombay Cat Breed Bombay Cat Breed Bombay Cat Breed Bombay Cat Breed Bombay Cat Breed Lifespan 12 - 20 years Weight 3.6 - 6.8kg Colours Jet-black coat that has the gloss and shine of patent leather The need-to-know Great for first-time cat owners Enjoys playing games and is active at home Calm cat Sociable and dependent cat Slightly talkative cat Average build cat breed Requires grooming once a week A bit of both indoor and outdoor space Great family cat Can be left alone all day Great for a relaxed home Generally healthy breed Bombay cats can suffer from: Polycystic kidney disease which is an inherited condition where cysts form in the kidneys. This affects kidney function and can eventually lead to kidney failure.",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "authority": "OTHER",
+            "fact_check_site": false,
+            "cluster_id": "C1-K3",
+            "relevance": 0.567857
+          },
+          {
+            "evidence_id": "C1-E8",
+            "url": "https://en.wikipedia.org/wiki/Bombay_cat",
+            "domain": "en.wikipedia.org",
+            "title": "Bombay cat - Wikipedia",
+            "published_date": null,
+            "text": "The UK-type is registered as the Asian Self under the Asian group with the Governing Council of the Cat Fancy (GCCF), which is the sole registry that recognises the British Bombay and operates in the UK. Popularity [edit] The Bombay cat is a relatively rare breed among pedigree cats, both in the US and UK types. All the UK-type Bombays are pedigreed with the GCCF as the Asian Self under the Asian group. In 2023, only 160 kittens of the entire Asian group were pedigreed. There is no data available for the British Bombay specifically. The US-type is notably more popular than the UK-type, although still rare. In France specifically, an average of 45 Bombay kittens were born annually between 2003 and 2022. In 2024, only 13 Bombay kittens were registered with the major global registry FIFe, representing less than 0,1% of their total registrations and ranking place 49th out of the 54 breeds in popularity. Data from TICA, one of the largest cat registries globally, indicates that between 1979 and 2013, a total of 1085 Bombay cats (32 on average annually) were registered with them.",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "authority": "SECONDARY",
+            "fact_check_site": false,
+            "cluster_id": "C1-K4",
+            "relevance": 0.552857
+          }
+        ],
+        "retrieval_rounds": 1,
+        "search_credits": 3,
+        "sources_considered": 6
+      },
+      {
+        "claim_id": "C2",
+        "index": 2,
+        "statement": "The Bombay cat has a weight of 3.6- 6.8kg",
+        "source_excerpt": "3.6- 6.8kg",
+        "claim_type": "NUMERIC",
+        "checkability": "CHECKABLE",
+        "time_sensitive": false,
+        "verdict": "REFUTED",
+        "rationale": "sufficient evidence directly contradicts the claim",
+        "model_proposed_verdict": "CONFLICTING",
+        "supporting": [],
+        "refuting": [
+          {
+            "evidence_id": "C2-E2",
+            "url": "https://en.wikipedia.org/wiki/Bombay_cat",
+            "title": "Bombay cat - Wikipedia",
+            "published_date": null,
+            "quote": "Their weight ranges between 2.5–5 kg (5.5–11.0 lb)",
+            "stance": "REFUTES",
+            "directness": "PARTIAL",
+            "authority": "SECONDARY",
+            "cluster_id": "C2-K1",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "fact_check_site": false,
+            "recent": null,
+            "weight": 0.45
+          },
+          {
+            "evidence_id": "C2-E4",
+            "url": "https://en.wikipedia.org/wiki/Bombay_cat",
+            "title": "Bombay cat - Wikipedia",
+            "published_date": null,
+            "quote": "For females, the average is 2.5–3.5 kg (6–8 lb). For males, the average is 3.5–5 kg (8–11 lb).",
+            "stance": "REFUTES",
+            "directness": "PARTIAL",
+            "authority": "SECONDARY",
+            "cluster_id": "C2-K1",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "fact_check_site": false,
+            "recent": null,
+            "weight": 0.45
+          },
+          {
+            "evidence_id": "C2-E5",
+            "url": "https://untamed.com/blogs/cat-breeds/fat-bombay-cat",
+            "title": "How to get a fat Bombay cat to slim down [Essential guide]",
+            "published_date": null,
+            "quote": "Male—3.5 to 6.8 kilos Female—2.5 to 4.5 kilos",
+            "stance": "REFUTES",
+            "directness": "PARTIAL",
+            "authority": "OTHER",
+            "cluster_id": "C2-K3",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "fact_check_site": false,
+            "recent": null,
+            "weight": 0.24
+          }
+        ],
+        "context": [],
+        "correction": null,
+        "correction_note": "No correction could be established from the validated evidence. (the proposed correction contained details not found in the cited evidence)",
+        "score": 60,
+        "score_caps": [],
+        "support_score": null,
+        "refute_score": null,
+        "strengths": {
+          "support": 0.0,
+          "refute": 0.582,
+          "context": 0.0
+        },
+        "failure_reason": null,
+        "notes": [
+          "page extraction failed for 1 URL(s); snippets used at reduced weight",
+          "model proposed CONFLICTING; deterministic rules selected REFUTED",
+          "2 model citation(s) rejected by validation: C2-E1: quote is too short to verify; C2-E6: figures measure different things (entity/metric/unit/scope/period differ)",
+          "judgment needed one repair attempt"
+        ],
+        "rejected_citations": 2,
+        "evidence": [
+          {
+            "evidence_id": "C2-E1",
+            "url": "https://www.purina.co.uk/find-a-pet/cat-breeds/bombay",
+            "domain": "purina.co.uk",
+            "title": "Bombay - Cat Breed Information Guide | Pro Plan",
+            "published_date": null,
+            "text": "Home Purina UK Your Pet, Our Passion. Bombay Cat Like a panther in miniature, the Bombay is an elegant yet strong cat that’s curious, active, and highly affectionate. They love spending time with their owners and can be very social with other people too. As extroverted as dogs, the Bombay cat breed is perfect for even first-time owners! Bombay Cat Breed Bombay Cat Breed Bombay Cat Breed Bombay Cat Breed Bombay Cat Breed Bombay Cat Breed Lifespan 12 - 20 years Weight 3.6 - 6.8kg Colours Jet-black coat that has the gloss and shine of patent leather The need-to-know Great for first-time cat owners Enjoys playing games and is active at home Calm cat Sociable and dependent cat Slightly talkative cat Average build cat breed Requires grooming once a week A bit of both indoor and outdoor space Great family cat Can be left alone all day Great for a relaxed home Generally healthy breed Bombay cats can suffer from: Polycystic kidney disease which is an inherited condition where cysts form in the kidneys. This affects kidney function and can eventually lead to kidney failure.",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "authority": "OTHER",
+            "fact_check_site": false,
+            "cluster_id": "C2-K2",
+            "relevance": 0.8325
+          },
+          {
+            "evidence_id": "C2-E2",
+            "url": "https://en.wikipedia.org/wiki/Bombay_cat",
+            "domain": "en.wikipedia.org",
+            "title": "Bombay cat - Wikipedia",
+            "published_date": null,
+            "text": "Two adults. The Bombay is a short-haired pedigreed breed of domestic cat, closely related to the Burmese. The US-type Bombay is described as the \"patent leather kid with the new penny eyes.\" The cats are characterised as having an all-black coat, including the whiskers, and black skin, including the soles and nose leather. The close-lying, sleek and glossy black coat of mature cats is coloured to the roots with no paling (exceptions are allowed in juvenile cats less than 2 years old). The eyes are always copper-golden coloured, and green (or any other colour) eyes are not allowed. The Bombay has a medium-sized, Oriental-type body build that is muscular. Their weight ranges between 2.5–5 kg (5.5–11.0 lb), with males typically being heavier than females. Breed standard [edit] Body: Medium size, graceful and elongated Oriental-type body. Elegant tail of medium length. _(cropped).jpg) Typical side profile of the head. Head: Rounded heads with no sharp angles, and short. The shape is smooth. The muzzle is short, with a moderate nose \"stop\" which is visible (not a break). The short-nosed head shape is similar to the American-type Burmese.",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "authority": "SECONDARY",
+            "fact_check_site": false,
+            "cluster_id": "C2-K1",
+            "relevance": 0.74475
+          },
+          {
+            "evidence_id": "C2-E3",
+            "url": "https://untamed.com/blogs/cat-breeds/fat-bombay-cat",
+            "domain": "untamed.com",
+            "title": "How to get a fat Bombay cat to slim down [Essential guide]",
+            "published_date": null,
+            "text": "LIMITED OFFER 40% OFF: 12-tin trial box now just £7! 🐱 Support Try Now Login Support Try Now Login LIMITED OFFER 40% OFF: 12-tin trial box now just £7! 🐱 How to get a fat Bombay cat to slim down [Essential guide] Do you have a fat Bombay cat, or are they supposed to be huge? Bombay cats, with their lustrous dark coats and striking yellow eyes, are royalty among black cats. These kitties are persuasive charmers that effortlessly put their humans under a spell. Since they are relatively rare in the UK, you may struggle to find accurate size standards and determine whether you have a fat Bombay cat. If you suspect that your furry friend is heavier than they should be, join us in tackling the following questions: What’s the standard size, weight, and body type of Bombay cats? How to tell if your cat is fat How to help an overweight cat of this breed get fit We’ll also introduce you to the nutrient-dense cat food products that can help Bombay kitties stay in excellent shape for life. Standard Bombay cat size, weight, and body type Bombay cats aren’t your average black cats. Their coat is the deepest, glossiest shade of black.",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "authority": "OTHER",
+            "fact_check_site": false,
+            "cluster_id": "C2-K3",
+            "relevance": 0.673125
+          },
+          {
+            "evidence_id": "C2-E4",
+            "url": "https://en.wikipedia.org/wiki/Bombay_cat",
+            "domain": "en.wikipedia.org",
+            "title": "Bombay cat - Wikipedia",
+            "published_date": null,
+            "text": "The medium-sized ears are wide-set, straight, and rounded at the tips. Eyes: The large, round eyes are set far apart and are always copper-coloured, but can range from bright orange to warm golden. Green eyes are not allowed. Coat: Short, dense and shiny, tight to the body, with a lacquered sheen. Only completely solid black coloured coats are allowed. Weight: For females, the average is 2.5–3.5 kg (6–8 lb). For males, the average is 3.5–5 kg (8–11 lb). Behaviour [edit] The personality of the Bombay tends to be highly social, is marked by strong attachment to families, and is typified by craving attention. As a breed, these characteristics make them highly suitable for children. Domesticated Bombay cats have been noted to thrive as strictly indoor cats, and are able to survive in a single room apartment, so long as all of their needs are met. Anecdotally, many prefer quieter surroundings. Health [edit] A healthy Bombay has an average lifespan of 15 years, and some have been known to live up to 20. They are prone to nasal and sinus problems, and gingivitis. Their food intake should be controlled to avoid overfeeding. References [edit] 1. 1 2 3 4 5 6 7 8 van Zyl, Miezan (2015).",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "authority": "SECONDARY",
+            "fact_check_site": false,
+            "cluster_id": "C2-K1",
+            "relevance": 0.6705
+          },
+          {
+            "evidence_id": "C2-E5",
+            "url": "https://untamed.com/blogs/cat-breeds/fat-bombay-cat",
+            "domain": "untamed.com",
+            "title": "How to get a fat Bombay cat to slim down [Essential guide]",
+            "published_date": null,
+            "text": "Even their noses and paw pads are the blackest black, giving them a dramatic mystical look! Bombays should be small and athletic, and you can refer to the following table to understand their distinguishing physical traits: | | | --- | | Feature | Information | | Size | Height—28 to 36 centimetres Length—33 to 56 centimetres Bombays are medium-sized cats. Kittens develop slowly and reach their adult size in 2 years | | Weight | Male—3.5 to 6.8 kilos Female—2.5 to 4.5 kilos The weight of an adult Bombay cat can be deceptive. They can be heavier than they look because of their body type | | Body type | Bombay cats have a compact, muscular body with rounded features (eyes, ears, tail tips, etc.) They have: Heavy bones and strong muscles with little body fat A round face and defined curves around their neck and waist (no jowls or loose belly) A thick coat tightly hugging their stocky features | You can effortlessly notice the shapely outline of a healthy Bombay cat when they sit or stand. If that’s not the case with your kitty, they may either be fat or belong to a different breed like the Himalayan or Norwegian Forest. By all standards, I’m a petite, heavy-boned lil’ panther.",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "authority": "OTHER",
+            "fact_check_site": false,
+            "cluster_id": "C2-K3",
+            "relevance": 0.650625
+          },
+          {
+            "evidence_id": "C2-E6",
+            "url": "https://cats.com/cat-breeds/bombay",
+            "domain": "cats.com",
+            "title": "Bombay Cat Breed: Size, Appearance & Personality",
+            "published_date": null,
+            "text": "Cat Breeds Bombay Cat: Characteristics, Personality, and Breed Information Bombay Compare Breed United States 8\"-10\" Adult weight 6-11 pounds Life Span 12-16 years Playful, easygoing, intelligent, sociable Other Names Black Mamba, Mini Panther Medium-sized short-haired Word’s Cat Population Ever wondered how many cats live around the globe? See how many cats call each country home. Explore the latest statistics and compare feline populations around the world. See the Statistic > Affection Level ? Breeds with a high affection level want to give and receive a lot of attention, while less-affectionate breeds are not as interested in petting and snuggles. 0 100% 90% Activity Level ? Breeds with high activity levels will engage more in active play and demand more space and attention. 0 100% 70% Pet-Friendly ? How well the breed tends to get along with cats, dogs, and other pets. 0 100% 70% Kid-Friendly ? Breeds with a higher rating in this area tend to be gentle and patient, while lower-rated breeds may feel uncomfortable with children. 0 100% 80% Sociability ?",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "authority": "OTHER",
+            "fact_check_site": false,
+            "cluster_id": "C2-K4",
+            "relevance": 0.575625
+          },
+          {
+            "evidence_id": "C2-E7",
+            "url": "https://cats.com/cat-breeds/bombay",
+            "domain": "cats.com",
+            "title": "Bombay Cat Breed: Size, Appearance & Personality",
+            "published_date": null,
+            "text": "If you’re still struggling at bed time, we’d recommend trying methods that don’t involve punishment (like the spray bottle). This method can be frightening for some cats and positive-reinforcement methods often offer more long-term success. We have an article on reasons to avoid punishment for cats and some alternatives here: Click to rate 4. Di I adopted a kitten from a local shelter who was described as a Bombay. That didn’t matter to me, but she has every characteristic listed for Bombay cats. All this to say that rescue kittens can be just as good if not better than buying a breed cat. Reply ↓ Click to rate 5. Susan Smid My Cat Murphy is 15yrs of age, is a big boy weighs 20 lbs. Has been very vocal in his box when defecating. Stool is soft and good amt. When he is being vocal, you would swear I’m killing him! It’s heart breaking to hear every nite. Made a video of his vocalization for the Vet. She did not respond. Suggestions? Reply ↓ Click to rate 1. small mallory photo Mallory Crusta Have you ruled out vision issues, deafness, or dementia? Loud meowing can be connected to these, and I wonder if he feels particularly vulnerable when in the litter box.",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "authority": "OTHER",
+            "fact_check_site": false,
+            "cluster_id": "C2-K4",
+            "relevance": 0.49125
+          },
+          {
+            "evidence_id": "C2-E8",
+            "url": "https://www.purina.co.uk/find-a-pet/cat-breeds/bombay",
+            "domain": "purina.co.uk",
+            "title": "Bombay - Cat Breed Information Guide | Pro Plan",
+            "published_date": null,
+            "text": "They are outgoing, intelligent, and friendly, and will get along well with family, other pets, and friends. | | | --- | | Family-friendly: | 4/5 | | Playfulness: | 4/5 | | Intelligence: | 4/5 | | Tendency to Vocalise: | 3/5 | | Likes Other Pets: | 4/5 | | Grooming needs: | 2/5 | | Shedding: | 2/5 | The Bombay was created in Louisville, Kentucky by a breeder who wanted to produce a ‘parlour panther’ - in other words, a jet-black cat with stunning copper eyes and a lithe, muscular build. There is little doubt that the Bombay very much fits this brief! Ms Horner began her efforts in 1953 by breeding a black American Shorthair with a particularly strong eye colour, to a sable Burmese female. Through a long process of selective breeding, outcrossing and strict control over the line, she was able to consistently produce a striking black cat unlike any other. While a potential cat theft risk, access to a secure garden or purpose-built cat run will be appreciated. The Bombay will enjoy climbing and sunbathing, pouncing on leaves and lurking in hidey-holes, so be creative with your ‘catio furniture’ and enrichment opportunities.",
+            "snippet_only": false,
+            "injection_flagged": false,
+            "authority": "OTHER",
+            "fact_check_site": false,
+            "cluster_id": "C2-K2",
+            "relevance": 0.46875
+          }
+        ],
+        "retrieval_rounds": 1,
+        "search_credits": 3,
+        "sources_considered": 6
+      }
+    ],
+    "dropped_claims": [],
+    "over_limit_claims": [],
+    "warnings": [],
+    "stats": {
+      "llm_calls": 4,
+      "search_credits_used": 6,
+      "search_credit_budget": 40,
+      "elapsed_s": 23.42,
+      "model": "gemini-3.5-flash-lite",
+      "fallback_model": "ollama:qwen3:4b",
+      "fallback_calls": 0
+    },
+    "score_disclaimer": "experimental rubric; not a probability and not calibrated.",
+    "as_of": "2026-10-27"
+  },
+  "not_checked_reason": null,
+  "claim_traces": [
+    {
+      "claim_id": "C1",
+      "line_numbers": [
+        9
+      ],
+      "block_numbers": [
+        3
+      ],
+      "min_ocr_score": 0.9597,
+      "ocr_reliable": true,
+      "located": true
+    },
+    {
+      "claim_id": "C2",
+      "line_numbers": [
+        11
+      ],
+      "block_numbers": [
+        5
+      ],
+      "min_ocr_score": 0.9574,
+      "ocr_reliable": true,
+      "located": true
+    }
+  ],
+  "ocr_confidence_note": "OCR confidence measures how reliably characters were recognised. It is not evidence that the text is true and is not part of the evidence-strength score."
+}

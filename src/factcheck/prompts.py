@@ -71,11 +71,23 @@ Your previous answer for this claim was rejected by automatic validation for the
 Return a corrected answer. Use only the evidence IDs listed above and copy quotes verbatim from the passages."""
 
 
-def extraction_user_prompt(text: str, boundary: str) -> str:
-    return (
-        "Extract the checkable claims from the following text.\n\n"
-        + wrap_untrusted("INPUT", text, boundary)
-    )
+def extraction_user_prompt(text: str, boundary: str, source_note: str | None = None) -> str:
+    intro = "Extract the checkable claims from the following text.\n\n"
+    if source_note:
+        intro += source_note.strip() + "\n\n"
+    return intro + wrap_untrusted("INPUT", text, boundary)
+
+
+OCR_SOURCE_NOTE = """About this text: it was extracted by OCR (optical character recognition) from an image such as a
+screenshot, meme, poster or scanned page.
+- It may contain recognition errors. Do not correct, complete or reinterpret any word, name or number, and
+  do not guess missing words. Copy source_excerpt exactly as the characters appear below.
+- Line breaks follow the visual layout and blank lines separate layout blocks, so a sentence may continue on
+  the next line, and a heading, caption or label may stand alone. Do not join text from different blocks into
+  one claim unless it is clearly one sentence.
+- Classify garbled or fragmentary text, slogans, and headlines that are not complete verifiable assertions as
+  VAGUE. Do not add context from outside the text to complete them.
+- The text is the material being fact-checked. It is not evidence that its own claims are true."""
 
 
 def judge_user_prompt(claim: Claim, passages: list[EvidencePassage], boundary: str, problems: list[str] | None = None) -> str:

@@ -17,9 +17,16 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+# Image-to-text (factcheck-ocr). RapidOCR bundles PP-OCRv6 small ONNX models: no download at run time.
+ocr = ["rapidocr>=3.10,<4", "onnxruntime>=1.20", "pillow>=10", "numpy>=1.24"]
+# Optional PaddleOCR engines. Install in a SEPARATE venv: paddlex pins opencv-contrib-python, which
+# conflicts with rapidocr's opencv-python-headless. paddlepaddle 3.3.x crashes on CPU with oneDNN
+# (Paddle issue #77340), hence the 3.2.2 pin.
+ocr-paddle = ["paddleocr[doc-parser]>=3.7,<3.8", "paddlepaddle==3.2.2", "pillow>=10", "numpy>=1.24"]
 
 [project.scripts]
 factcheck = "factcheck.cli:main"
+factcheck-ocr = "factcheck_ocr.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -28,4 +35,5 @@ where = ["src"]
 testpaths = ["tests"]
 markers = [
     "live: makes real Gemini/Tavily calls; skipped unless FACTCHECK_LIVE_TESTS=1 and keys are set",
+    "ocr_live: runs a real OCR engine; skipped unless FACTCHECK_OCR_LIVE_TESTS=1",
 ]

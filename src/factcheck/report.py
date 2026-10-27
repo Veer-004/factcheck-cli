@@ -104,6 +104,8 @@ def _explanation(r: ClaimResult) -> str:
 def _failure_summary(reason: str) -> str:
     """Short, non-technical reason for PROCESSING_FAILED (full text in --verbose / JSON)."""
     low = reason.lower()
+    if low.startswith("ocr:"):
+        return "the image text it comes from could not be read reliably (try a clearer image)"
     if "budget" in low:
         return "the per-run search or model budget was used up"
     if "time limit" in low or "run time" in low:
@@ -185,11 +187,12 @@ def _strength_lines(r: ClaimResult, disclaimer: str) -> list[str]:
     return lines
 
 
-def render_claim(r: ClaimResult, number: int, total: int, disclaimer: str, verbose: bool = False) -> list[str]:
+def render_claim(r: ClaimResult, number: int, total: int, disclaimer: str, verbose: bool = False,
+                 source_label: str = "your text") -> list[str]:
     header = f"Claim {number} of {total}" if total > 1 else "Claim"
     lines = [_wrap(f"{header}: {r.statement}", "", INDENT)]
     if " ".join(r.source_excerpt.split()).casefold() != " ".join(r.statement.split()).casefold():
-        lines.append(_wrap(f'From your text: "{r.source_excerpt}"'))
+        lines.append(_wrap(f'From {source_label}: "{r.source_excerpt}"'))
     lines.append(f"{INDENT}Verdict: {_VERDICT_TEXT[r.verdict]}")
     lines.append(_wrap(f"Explanation: {_explanation(r)}"))
     lines += _evidence_block("Supporting evidence", r.supporting, verbose)
@@ -231,7 +234,9 @@ def _diagnostics(report: Report) -> list[str]:
     return out
 
 
-def render_text(report: Report, verbose: bool = False) -> str:
+def render_text(report: Report, verbose: bool = False, source_label: str = "your text",
+                claim_extras: dict[str, list[str]] | None = None) -> str:
+    """``claim_extras`` maps a claim ID to extra lines printed under that claim (e.g. OCR traceability)."""
     claims = report.claims
     out = ["FACT-CHECK REPORT", ""]
     out.append(f"OVERALL VERDICT: {report.summary_label.value.replace('_', ' ')}")
@@ -243,7 +248,8 @@ def render_text(report: Report, verbose: bool = False) -> str:
         out.append(f"{_plural(len(claims), 'claim')}: " + ", ".join(f"{n} {v}" for v, n in counts.items()))
     for n, r in enumerate(claims, start=1):
         out.append("")
-        out += render_claim(r, n, len(claims), report.score_disclaimer, verbose)
+        out += render_claim(r, n, len(claims), report.score_disclaimer, verbose, source_label)
+        out += [_wrap(x) for x in (claim_extras or {}).get(r.claim_id, [])]
 
     notices = []
     if report.over_limit_claims:

@@ -11,4 +11,5 @@ __pycache__/
 
 # Generated output
 eval/results/
+eval/ocr_samples/
 report.json

@@ -21,7 +21,7 @@ import os
 import time
 from collections import Counter
 from dataclasses import dataclass
-from typing import Annotated, Any, Optional, TypedDict
+from typing import Annotated, Any, Callable, Optional, TypedDict
 
 from langgraph.errors import GraphRecursionError
 from langgraph.graph import END, START, StateGraph
@@ -71,6 +71,9 @@ class RunFailure(RuntimeError):
     """Run-level failure (CLI exit code 3)."""
 
 
+ClaimGate = Callable[[Claim], Optional[str]]
+
+
 @dataclass
 class Deps:
     llm: BudgetedLLM
@@ -78,6 +81,9 @@ class Deps:
     config: Config
     deadline: Deadline
     boundary: str
+    # Optional hooks for other input workflows (image/OCR). The text workflow sets neither.
+    source_note: Optional[str] = None  # extra instruction about the input's origin (extraction user prompt)
+    claim_gate: Optional[ClaimGate] = None  # reason to withhold a checkable claim before retrieval, or None
 
 
 # --------------------------------------------------------------------------
@@ -371,7 +377,7 @@ def build_graph(deps: Deps):
         return {"text": validate_input(state["text"], cfg)}
 
     def extract_claims(state: MainState) -> dict[str, Any]:
-        user = extraction_user_prompt(state["text"], deps.boundary)
+        user = extraction_user_prompt(state["text"], deps.boundary, deps.source_note)
         last_error = ""
         for attempt in range(2):  # one bounded retry for malformed output
             try:
@@ -396,8 +402,18 @@ def build_graph(deps: Deps):
             warnings.append(f"{len(cv.dropped)} extracted claim(s) dropped by validation")
         if cv.over_limit:
             warnings.append(f"{len(cv.over_limit)} checkable claim(s) not checked (over the per-run limit)")
+        checkable, withheld = cv.checkable, []
+        if deps.claim_gate is not None:
+            checkable = []
+            for claim in cv.checkable:
+                reason = deps.claim_gate(claim)
+                if reason:  # technical outcome, never a truth verdict; no search credits are spent
+                    withheld.append(_base_result(claim, Verdict.PROCESSING_FAILED, failure_reason=reason))
+                else:
+                    checkable.append(claim)
         return {
-            "checkable": cv.checkable,
+            "checkable": checkable,
+            "results": withheld,
             "not_checkable": cv.not_checkable,
             "dropped": cv.dropped,
             "over_limit": cv.over_limit,
@@ -526,6 +542,19 @@ def verify_text(
     Raises ``InputError`` (invalid input), ``ConfigError`` (missing credentials
     or bad configuration) or ``RunFailure`` (run-level failure).
     """
+    return run_pipeline(text, config, llm, search)
+
+
+def run_pipeline(
+    text: str,
+    config: Config | None = None,
+    llm: LLMClient | None = None,
+    search: SearchProvider | None = None,
+    *,
+    source_note: str | None = None,
+    claim_gate: ClaimGate | None = None,
+) -> Report:
+    """The shared pipeline behind :func:`verify_text` and ``factcheck.image.verify_image``."""
     config = config or Config.from_env()
     text = validate_input(text, config)
     deadline = Deadline(config.run_timeout_s)
@@ -546,6 +575,8 @@ def verify_text(
         config=config,
         deadline=deadline,
         boundary=make_boundary(),
+        source_note=source_note,
+        claim_gate=claim_gate,
     )
     graph = build_graph(deps)
     started = time.monotonic()
