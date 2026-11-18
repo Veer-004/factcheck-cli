@@ -23,10 +23,19 @@ ocr = ["rapidocr>=3.10,<4", "onnxruntime>=1.20", "pillow>=10", "numpy>=1.24"]
 # conflicts with rapidocr's opencv-python-headless. paddlepaddle 3.3.x crashes on CPU with oneDNN
 # (Paddle issue #77340), hence the 3.2.2 pin.
 ocr-paddle = ["paddleocr[doc-parser]>=3.7,<3.8", "paddlepaddle==3.2.2", "pillow>=10", "numpy>=1.24"]
+# Video fact-checking (factcheck-video): the OCR extra plus local speech-to-text. faster-whisper brings
+# PyAV (bundled FFmpeg libraries; no ffmpeg executable needed) and CTranslate2. Whisper models are
+# downloaded from Hugging Face only with --allow-download (base ~145 MB).
+video = ["faster-whisper>=1.2,<2", "av>=14", "rapidocr>=3.10,<4", "onnxruntime>=1.20", "pillow>=10", "numpy>=1.24"]
+# Audio fact-checking (factcheck-audio): local English speech-to-text only (no OCR). Reuses the video
+# module's Whisper and decoding code, which needs only these packages.
+audio = ["faster-whisper>=1.2,<2", "av>=14", "numpy>=1.24"]
 
 [project.scripts]
 factcheck = "factcheck.cli:main"
 factcheck-ocr = "factcheck_ocr.cli:main"
+factcheck-video = "factcheck_video.cli:main"
+factcheck-audio = "factcheck_audio.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -36,4 +45,6 @@ testpaths = ["tests"]
 markers = [
     "live: makes real Gemini/Tavily calls; skipped unless FACTCHECK_LIVE_TESTS=1 and keys are set",
     "ocr_live: runs a real OCR engine; skipped unless FACTCHECK_OCR_LIVE_TESTS=1",
+    "video_live: runs real speech recognition and OCR on a generated video; skipped unless FACTCHECK_VIDEO_LIVE_TESTS=1",
+    "audio_live: runs real speech recognition on generated audio; skipped unless FACTCHECK_AUDIO_LIVE_TESTS=1",
 ]

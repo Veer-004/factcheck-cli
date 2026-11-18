@@ -30,7 +30,8 @@ python -m venv .venv
 ```
 
 On macOS/Linux use `.venv/bin/python` instead. The install provides the `factcheck` command
-(`.venv\Scripts\factcheck.exe`). `python -m factcheck` also works.
+(`.venv\Scripts\factcheck.exe`). `python -m factcheck` also works. The other three commands are
+`factcheck-ocr` (images), `factcheck-video` and `factcheck-audio`. Each has its own section below.
 
 Dependencies: `langgraph`, `pydantic`, `google-genai`, `tavily-python` (+ `pytest` for dev).
 
@@ -225,7 +226,10 @@ The judge sees only the delimited claim and passages. It has no tools and no sea
 assessment, code checks that:
 
 - the evidence ID exists, and the URL is the one stored for it;
-- the quote is a verbatim substring of that passage (after normalisation) and at least 4 words long;
+- the quote is a verbatim substring of that passage (after normalisation) and at least 4 words long,
+  or a shorter table/infobox cell that is a labelled figure sharing a word with the claim
+  ("Payload : 1,650 kg"). Only a quote that is not in the passage counts as fabricated; if half or
+  more of a judgment's citations are fabricated, the judgment is rejected and repaired once;
 - the passage is about the claim's subject and the quote shares terms or figures with the claim;
 - a SUPPORTS quote isn't a debunking ("myth", "false", "no evidence"…) of a non-negated claim;
 - numeric SUPPORTS quotes contain the claimed figure, within rounding and with "about / more than /
@@ -369,6 +373,11 @@ so they need no OCR models. A real-engine OCR smoke test (RapidOCR, no network) 
 $env:FACTCHECK_OCR_LIVE_TESTS = "1"; .venv\Scripts\python.exe -m pytest tests/test_ocr_live.py -q
 ```
 
+The video tests (`tests/test_video_*.py`) decode real, tiny videos that they generate, but
+replace Whisper, the OCR engine, Gemini and Tavily with fakes. A real Whisper + RapidOCR
+extraction test is opt-in (Windows only, model must already be cached, no network). See
+[Video fact-checking](#video-fact-checking-factcheck-video).
+
 ## Evaluation
 
 ```bash
@@ -494,6 +503,56 @@ These are six synthetic images. They show that layout handling and stylised font
 are no benchmark for real photos, JPEG artefacts, curved or rotated text, or non-Latin scripts.
 Try your own images.
 
+**English clean-up (images and video frames).** The OCR is tuned for English text. After
+recognition, three deterministic steps run in `factcheck_ocr/pipeline.py`. They are shared by
+`factcheck-ocr` and `factcheck-video`, and each is reported as a note, never silently:
+
+1. **A noise filter** removes fragments that are almost never real text:
+   - text with no Latin letter or digit (`难`, `三`, `★`, `??`);
+   - a lone letter (`X`, `S`, `Q`);
+   - two letters that are not a common word or abbreviation (`um`, `TE`; but `Hi`, `OK`, `US` and
+     `BE` are kept);
+   - repeated-letter garbage (`IIII`, `mwwwmm`).
+
+   Text that is only digits is always kept. Use `--keep-noise` (images) or `--keep-ocr-noise`
+   (video) to turn the filter off.
+2. **Symbol fixes:** `℃`/`℉` become `°C`/`°F`, full-width characters become normal ASCII, and a
+   standalone `Il` becomes the Roman numeral `II` ("Pokhran Il" → "Pokhran II"). Full Unicode
+   NFKC is deliberately *not* used, because it would turn `10³` into `103`.
+3. **Tiny figures are marked uncertain.** A text box that contains digits but is under 11 px tall
+   (in the pixels the recogniser saw) has its confidence capped at 0.60. The text is kept as read,
+   but it is shown with `?`, and the fact-check gates set aside claims that depend on it. The
+   reason: in a 640×360 video, a 10-px-tall "$1.5 billion" was read as "**$1.8** billion" with 0.92
+   confidence. This rule rests on one measured case and is a deliberately cautious heuristic.
+
+`eval/run_real_ocr_eval.py` measures OCR on 19 frames from three real English videos
+(screenshots of infographics, documents, maps and burned-in subtitles). The ground truth was
+written by hand. The frames come from personal videos, so `eval/ocr_real/` is git-ignored. Measured
+on 2026-11-17:
+
+| | text read | figures read exactly | junk in output | blank frame with output |
+|---|---|---|---|---|
+| Before the clean-up | 95.7% | 34/37 | 19 tokens (6.5%) | 1 (`难`) |
+| **After** | **96.4%** | 34/37 (the misread one is now flagged uncertain) | **13 tokens (4.5%)** | 0 |
+
+Alternatives tested on the same frames and **rejected**:
+
+| Option | Result | Reason rejected |
+|---|---|---|
+| 2× upscaling of small frames | recall 0.931, junk 8.3% | Worse on both counts |
+| PP-OCRv6 medium models | recall 0.960, junk 4.4% | 10× slower |
+| RapidOCR English-only recogniser (PP-OCRv5) | recall 0.946 | Fixed "$1.5" but introduced other errors ("e8ay", "Poli") |
+| English PP-OCRv4 recogniser | recall 0.855 | Much worse |
+| Re-reading figures with the English model and flagging disagreements | n/a | Missed the "$1.8" misread and raised false alarms ("5,000" → "5,00") |
+
+Remaining errors are misreads inside real text: a table's "4,000" read as "4.000",
+"e-scooter limit" read as "e-scooter-limit", sideways "Stage" labels, and a logo partly hidden
+by an animation ("SFACEX").
+
+```bash
+.venv\Scripts\python.exe eval\run_real_ocr_eval.py --show
+```
+
 **OCR limitations.**
 - Reading order assumes left-to-right, top-to-bottom text that is roughly horizontal. It can't
   split columns that the detector itself merged into one box. Text inside figures is ordered by
@@ -605,6 +664,385 @@ Three separate quantities, never mixed:
   `-e ".[ocr-paddle]"` with dependencies there, or use the default rapid engine.
 - The live path through the Ollama fallback has not been tested for images; for text it is
   known not to produce verdicts with `qwen3:4b`.
+
+## Video fact-checking (`factcheck-video`)
+
+A third, separate command fact-checks the claims **spoken** in a video and shown as **on-screen
+text**. It is CLI only. It does not interpret pictures: objects, scenes, gestures and events are
+never used as evidence or as claims. Only speech and visible text are checked.
+
+```bash
+.venv\Scripts\python.exe -m pip install -e ".[video]"
+```
+```bash
+.venv\Scripts\factcheck-video.exe --check
+```
+```bash
+.venv\Scripts\factcheck-video.exe clip.mp4 --allow-download
+```
+
+The first run with `--allow-download` downloads the speech model (base, about 145 MB) into
+`~/.cache/huggingface/hub`. Later runs reuse it and never download anything. Without that flag, a
+missing model is reported as an error (exit 2) and nothing is downloaded. Other useful forms:
+
+```bash
+.venv\Scripts\factcheck-video.exe clip.mp4 --extract-only -v
+```
+```bash
+.venv\Scripts\factcheck-video.exe clip.mp4 --json-out report.json --whisper-model small --frame-interval 1
+```
+
+`--extract-only` shows the transcript and on-screen text and needs no API keys. The fact-check uses
+the same `.env` keys as `factcheck`. Exit codes match `factcheck`: 0 resolved, 1 partial or nothing to
+check, 2 invalid input, missing model or configuration problem, 3 run failure. `python -m
+factcheck_video` also works.
+
+**Prerequisites.** You don't need to install FFmpeg separately. faster-whisper depends on PyAV, and
+PyAV's wheels bundle the FFmpeg libraries (FFmpeg 8, libavcodec 62 on the test machine). They read
+MP4, MOV, MKV, WebM, AVI and other common formats. The extension allow-list is in
+`factcheck_video/media.py`. The `video` extra adds faster-whisper, CTranslate2, PyAV, tokenizers and
+huggingface-hub, plus the OCR extra's packages. It upgrades nothing that is already installed.
+
+### How it works
+
+```
+video -> probe (PyAV/FFmpeg: streams, duration, size limits)
+      -> audio track --stream--> temp 16 kHz mono WAV -> faster-whisper (CPU, int8, VAD) -> sentence segments
+      -> frames sampled every 2 s -> unchanged-frame check -> factcheck_ocr (RapidOCR) -> text blocks
+      -> merge identical text across frames and across speech/screen (stage 1)
+      -> labelled, time-ordered text -> factcheck.graph.run_pipeline:
+           claim extraction (video note) -> validation with the strict duplicate rule (stage 2)
+           -> extraction-reliability gate -> retrieval -> judge -> validation -> deterministic verdict
+      -> claim provenance (speech/screen, timestamps, segment and text-block ids) -> report
+```
+
+- **Speech and on-screen text are both extracted first, then compared.** Deduplication saves
+  verification work. Extraction itself still processes both.
+- **Audio.** The first audio stream is decoded packet by packet into a temporary WAV in a private
+  temp folder. The folder is deleted afterwards, also on failure (tested). The video is never fully
+  loaded into memory. If decoding fails part-way, the audio up to the error is still used and a note
+  is added.
+- **Speech-to-text.** faster-whisper runs on CPU with int8 quantisation, voice-activity filtering
+  and word timestamps. The model is multilingual and detects the language unless `--language` is
+  set. Whisper segments are split into sentences at sentence-final punctuation (not after "U.S."
+  or "Dr."). This happens because Whisper can put sentences spoken seconds apart into one segment.
+  A segment counts as reliable when Whisper's own confidence, exp(average log-probability), is at
+  least `--speech-threshold` (default 0.40). It also must not be repetitive (compression ratio above
+  2.4) or look like silence.
+- **Frames.** One frame is sampled every `--frame-interval` seconds (default 2, at most
+  `--max-frames` 150). The interval widens automatically for long videos. Frames are found by
+  seeking and short forward decoding, and downscaled to 1920 px. A frame whose 160x90 RGB thumbnail
+  is unchanged reuses the previous frame's OCR result. It is RGB because a grayscale check missed a
+  colour change of similar brightness. Each frame goes through the OCR module's own box filtering
+  and reading-order code (no second OCR model). Each OCR block (caption, title, label) is tracked
+  across frames.
+- **Subtitles.** Burned-in subtitles are recognised and attached to the spoken sentence they
+  transcribe, so a subtitled sentence is checked once, in full (see the deduplication rules
+  below).
+- **The fact-check input.** It lists the unique text pieces in time order, under `[speech]`,
+  `[on-screen text]` or `[speech, also shown on screen]` labels. Timestamps are left out, so no time
+  figures can end up in claims. The extraction prompt tells the model the text is an automatic
+  transcript or OCR, not to correct or complete it, and that greetings, calls to subscribe and
+  opinions are not claims. It also tells the model to extract a claim once for each place it appears,
+  with identical wording when the claim is the same, so that code can merge it. Everything after that
+  is the shared pipeline, with all its validation and prompt-injection defences unchanged.
+- **Reliability gate.** A claim whose every source (speech segment or text block) is below its
+  confidence threshold is withheld as PROCESSING_FAILED with an `extraction:` reason. That is a
+  technical outcome, not a verdict, and no search credits are spent on it. If every extracted
+  piece is unreliable, no model or search call is made at all.
+
+### Deduplication rules
+
+| Stage | What is merged | What is never merged |
+|---|---|---|
+| Across frames | The same block text (case, punctuation and spacing ignored), anywhere in the video: one observation with every frame time. Near-identical OCR variants (≥ 0.92 character similarity) in the **next** sampled frame. | Variants whose numbers, letter-digit codes ("A380", "boi1s"), negation, units, months, comparison words or 1-2-letter words differ |
+| Speech vs screen, before extraction | A speech sentence and a text block with **identical** wording after removing case, punctuation and spacing: one unit carrying both sources | Anything less than identical, except subtitles (next row) |
+| Subtitles, before extraction | On-screen text seen while a sentence is spoken whose words occur **in order** in that sentence (or across the boundary into the next one): it is attached to the spoken sentence, checked once in full context, and kept in the provenance | Captions of 1-2 characters ("1", "2"); captions whose spoken sentence has a negation or denial word outside the caption ("It is a **myth** that the Great Wall is visible …" keeps the caption "The Great Wall is visible …" separate) |
+| Claims, after extraction | Two claims whose statements are identical after normalisation, or have the same content words **in the same order** and the same numbers, negation, units, months, codes, comparison/quantity words, modal/tense/logic words and names, **and** whose verbatim source excerpts agree on numbers, negation, units, months and codes | Synonyms, paraphrases, reordering, an added scope word ("adult human body"). These are checked twice: extra cost, nothing lost |
+
+Claim-level merging uses the existing `near-duplicate` step in `validation.validate_claims`, with the
+stricter video rule passed in (`factcheck_video/textmatch.py`). The text workflow's own rule ignores
+negation. That is fine for one paragraph, but a video can say "is not visible" while the screen says
+"is visible". A merged claim is reported once, with every place it came from. When equivalence is
+uncertain, both claims are kept. Conflicting speech and screen claims are both checked
+independently; neither source is treated as correct.
+
+### Reports, timestamps and provenance
+
+The terminal report shows:
+
+- the media details;
+- each stage's status (OK, LOW CONFIDENCE, UNRELIABLE, nothing found, no track, skipped, FAILED);
+- the timed transcript, with `?` marking unreliable segments;
+- the on-screen text with the sampled-frame times it was seen, so a gap means the text disappeared
+  and came back;
+- the shared fact-check report, where each claim also gets lines such as
+  `Spoken ~00:00.3-00:04.0 (word timing), segment 1, speech confidence 0.82` and
+  `On screen: seen in sampled frames 00:02.0-00:06.0, text block 1, OCR confidence 0.99`.
+
+`--json-out` writes the whole structure: media, both stages with every segment, word and
+observation, the exact checked text, the shared `Report`, `claim_sources`, the merged duplicates and
+timings. It is UTF-8 and not ASCII-escaped, and it round-trips through the Pydantic model (tested).
+
+Precision of the times:
+
+- **Speech times** are Whisper's estimates, accurate to roughly half a second. They are narrowed to
+  the claim's own words when word timestamps exist.
+- **On-screen times** are sampled-frame times. Text may have appeared up to one interval earlier
+  and stayed up to one interval later.
+- The **extraction confidence** values (speech and OCR) say how reliably words were *recognised*.
+  They are separate from evidence strength and from the verdict.
+
+### CPU, RAM and model choice
+
+These figures were measured on this laptop (i5-12500H, 16 GB, CPU only, int8) with
+`eval/run_video_eval.py`, over 11 synthetic clips (95 s of audio). RTF is transcription time divided
+by audio length (lower is faster). RAM is the peak working set of the whole eval process, with
+RapidOCR loaded:
+
+| Model (multilingual) | Download | Load | RTF | Peak RAM | WER, clean TTS speech | WER, speech under heavy noise |
+|---|---|---|---|---|---|---|
+| tiny | ~75 MB | 0.5 s | 0.06 | not measured | 0.00 | not measured |
+| **base (default)** | ~145 MB | 0.7 s | 0.11-0.26 (varied between runs) | ~545 MB | 0.00 | 1.40 (nonsense, flagged UNRELIABLE) |
+| small | ~484 MB | 1.2-1.5 s | 0.33 | ~826 MB | 0.00 | 0.70 (still wrong, flagged UNRELIABLE) |
+
+Base is the default because it is about 3x faster than small with less RAM, and synthetic clean
+speech didn't separate the two. Use `--whisper-model small` (or `medium`, ~1.5 GB) for accents,
+noise or non-English speech, where larger models are known to be much better. That claim is
+**not measured here**: there is no non-English or real-world clip in the set. Frame sampling plus
+OCR was the slower part on these short clips. It took 54.8 s in total for the 11 clips, about 3-8 s
+per clip, even when only one frame needed OCR. Speed was not optimised further; expect several
+minutes for a 10-minute video.
+
+### Evaluation
+
+```bash
+.venv\Scripts\python.exe eval\make_video_samples.py
+```
+```bash
+.venv\Scripts\python.exe eval\run_video_eval.py --models tiny,base,small
+```
+```bash
+.venv\Scripts\python.exe eval\run_video_eval.py --live
+```
+
+`make_video_samples.py` generates the 11 clips. The speech comes from offline Windows SAPI voices and
+the frames are drawn with Pillow, so there is no third-party media. The `--live` flag runs the real
+fact-check on 5 claim cases (at most 12 Tavily credits each). Results with base, measured
+2026-10-27 to 2026-10-29:
+
+- **Extraction:** WER 0.00 on all clean speech. On-screen word recall 1.00, including a 9 px
+  caption at 256x144.
+- **Deduplication:** distinct on-screen observations 10/10 and speech/screen exact merges 11/11
+  as expected. The claim rule on 40 labelled pairs had **precision 1.00** (0 wrong merges) and
+  recall 0.58. The 5 missed merges were synonyms, paraphrases, reordering and added words, all
+  checked twice by design.
+- **Provenance:** 18/18 utterances or captions placed within 0.75 s / one interval of their true
+  start.
+- **Robustness:** 2/2 corrupt or non-video files rejected (exit 2). Silence and noise produced no
+  speech in 5/5 cases. Heavy noise made Whisper hallucinate fluent text; it was flagged UNRELIABLE
+  and would be withheld.
+- **Live fact-check:** these are the per-case outcomes (Gemini 3.5 Flash-Lite + Tavily):
+
+  | Case | Result |
+  |---|---|
+  | Contradicting speech and screen claims | Both checked: "not visible" SUPPORTED, "is visible" REFUTED |
+  | Text with no audio | REFUTED |
+  | Same claim spoken and subtitled | One unit, checked once, SUPPORTED on the rerun (first run INSUFFICIENT_EVIDENCE) |
+  | Speech-only, 2 claims | Eiffel SUPPORTED; Everest SUPPORTED on the rerun (first run PROCESSING_FAILED) |
+  | Different years | Speech "1889" SUPPORTED; screen "1887" INSUFFICIENT_EVIDENCE, not REFUTED |
+
+  The "1887" claim was not mismatched by the video code: the existing validation rejected the
+  refuting citations, and the text command gives the same INSUFFICIENT_EVIDENCE for that sentence.
+
+None of these numbers says anything about real-world reliability. The clips are synthetic and
+short, and the speech is clean text-to-speech.
+
+**Real English videos (2026-11-17).** Three videos were each run more than once: an Elon Musk
+biography (animated, 2 min 43 s), an Agni-V explainer (mostly Hindi speech, English infographics)
+and a Usain Bolt short (English speech with burned-in subtitles). Observations:
+
+- **Burned-in subtitles.** In the Bolt video, 28 subtitle fragments were attached to the speech.
+  This removed a duplicate check of the 9.58 s claim and the excerpts the model had stitched
+  together from several fragments.
+- **The "$1.8 billion" on screen** (really "$1.5 billion" in tiny print) is now marked uncertain
+  instead of being treated as a contradiction of the narration.
+- **Run-to-run variation.** Verdicts for the same claim can differ between runs (for example,
+  SUPPORTED vs INSUFFICIENT_EVIDENCE for Zip2's founding). So can which claims Gemini extracts:
+  2 vs 5 from the same Agni video. Both come from the model and web search, not from extraction,
+  which gave the same text each time.
+- **Repairs the model shouldn't make.** Once, the extraction model wrote "Compaq" for the
+  transcript's misheard "Compact", despite being told not to repair text.
+- **Table figures (fixed 2026-11-17).** Claims taken from infographic tables (Agni-V payload
+  1,360.78 kg, height 17 m) repeatedly ended as PROCESSING_FAILED. The judge cited genuine short
+  table cells ("Length : 17.5 m", "Payload : 1,650 kg"). Validation counted them as fabricated
+  quotes and discarded the whole judgment. Now only quotes that are not in the source count as
+  fabricated. Short verbatim cells are accepted when they are labelled figures sharing a term with
+  the claim, and otherwise rejected only as weak citations. Live re-check: height 17 m became
+  SUPPORTED, and payload 1,360.78 kg became INSUFFICIENT_EVIDENCE (the judge's "1,500 kg"
+  support was correctly refused).
+
+### Limitations
+
+- **Pictures are not interpreted.** Charts, maps and scenes are ignored, and so are claims made
+  only through visuals.
+- **Recognition confidence is a weak signal.** Whisper confidence and OCR confidence can be high
+  for a wrong reading. Words that were never recognised (missed captions, muffled speech) cannot
+  be flagged.
+- **Frame sampling** at 2 s can miss text shown for less than 2 s. Use `--frame-interval 0.5` for
+  fast captions.
+- **Text limit.** Only the first `--max-text-chars` (default 6,000, at most 20,000) characters of
+  extracted text are checked. Later segments are listed as not checked, with their start time. One
+  video per run, at most 10 minutes and 500 MB by default (`--max-duration`, `--max-file-mb`). The
+  shared limits apply: 6 checkable claims, 40 search credits, 180 s for the fact-check, plus 900 s
+  for extraction (`--extract-timeout`).
+- **Deduplication edge case.** If a claim from an unreliable source is merged with the same claim
+  from a reliable one, the gate looks only at the claim that was kept. Merging is deliberately
+  strict, so paraphrased duplicates cost extra searches.
+- **Speaker identity** is not tracked, so a quoted or rebutted statement is checked like any other.
+- **Not tested here:** non-English speech, real camera footage, rotated phone videos (rotation
+  metadata is applied but untested), the PaddleOCR engines for video, and the Ollama fallback.
+- **Licences.** faster-whisper, CTranslate2, Whisper and Systran's converted models are MIT;
+  PyAV is BSD-3. PyAV's Windows wheel also bundles FFmpeg with GPL components (x264, x265). This
+  project only decodes and doesn't redistribute them, but check the FFmpeg licence before
+  redistributing a bundled build.
+
+### Troubleshooting (video)
+
+| Problem | Fix |
+|---|---|
+| `speech model 'base' is not downloaded` | Re-run once with `--allow-download`, or pass a local CTranslate2 model directory to `--whisper-model` |
+| `PyAV is not installed` / `faster-whisper is not installed` | `pip install -e ".[video]"` |
+| `not a readable video/audio file` | The file is corrupt, truncated or not a video. Try re-encoding it |
+| `unsupported file extension` | Rename only if it really is a video container, or convert it to MP4 |
+| `video is N s long; the limit is …` | Use `--max-duration`, or cut the video |
+| Speech `nothing found` | Silence or music only. Try `--no-vad` if quiet speech was filtered out |
+| Speech `UNRELIABLE` | Noisy audio. Try `--whisper-model small` and set `--language` |
+| On-screen text missed | Use a smaller `--frame-interval`, or `--ocr-model-size medium --allow-download` |
+| Hugging Face symlink warning on Windows | Harmless. The cache works without symlinks but uses more disk |
+| `An Application Control policy has blocked this file` for a `.exe` launcher | Windows Smart App Control. Run `python -m factcheck_video` (or `python -m factcheck`) instead |
+
+## Audio fact-checking (`factcheck-audio`)
+
+The fourth command fact-checks what is said in an **English** audio file: a podcast, interview,
+lecture or voice note. Speech is transcribed locally with faster-whisper, and the transcript goes
+through the same shared fact-checking pipeline as `factcheck` (claim extraction, validation,
+retrieval, judge, citation validation, deterministic verdicts). Only the transcription is new.
+
+```bash
+.venv\Scripts\python.exe -m pip install -e ".[audio]"
+```
+```bash
+python -m factcheck_audio podcast.mp3
+```
+```bash
+python -m factcheck_audio recording.m4a --extract-only
+```
+```bash
+python -m factcheck_audio interview.wav --json-out report.json
+```
+
+`factcheck-audio …` (the installed launcher) does the same thing. `--extract-only` (alias
+`--transcribe-only`) needs no API keys. The audio extra is a subset of the video extra (faster-whisper,
+PyAV, numpy), so nothing new is installed if video already works. No new API or key is used.
+
+### How it works
+
+```
+audio file -> validation (extension, size, readable, has audio, duration)
+           -> PyAV decode -> 16 kHz mono WAV (temporary, always deleted)
+           -> faster-whisper: language identification -> English only -> timed segments (+ word times)
+           -> transcript as plain prose (no timestamps in the text)
+           -> shared run_pipeline (audio note, conservative duplicate rule, transcription-reliability gate)
+           -> each claim traced back to its segment(s), start/end time and transcription confidence
+```
+
+* **Formats.** MP3, WAV, M4A/AAC, FLAC, OGG and Opus are tested; WMA, AIFF, AMR, MKA, CAF, AC3 and
+  MP2 are accepted too (anything the bundled FFmpeg decodes). Video files are refused with a pointer
+  to `factcheck-video`. Embedded cover art is ignored.
+* **English only.** Whisper identifies the language over up to ~90 s of speech before decoding. If
+  it is not English, nothing is decoded and the report says so (exit 1). Non-English speech is never
+  translated or force-decoded into English words that weren't said. `--assume-english` skips
+  identification, for accented English that Whisper misidentifies. Any segment that still comes out
+  in a non-Latin script is marked unreliable and never checked. A `*.en` model (e.g. `base.en`)
+  skips identification.
+* **Code reuse, not duplication.** Model loading (local cache only unless `--allow-download`),
+  segment confidence, sentence splitting, the WAV decoder and the duplicate rule come from
+  `factcheck_video` unchanged. The video module doesn't import anything from the audio module, and
+  the audio module never loads OCR or the video pipeline.
+* **Claims.** The audio note tells the extractor to skip greetings, fillers, questions, opinions,
+  predictions and promotional calls to action. Fragments and garbled passages are classed VAGUE. It
+  must copy words, names and numbers exactly as transcribed. The shared validation still drops
+  invented excerpts and changed figures. A claim repeated in the recording is checked once, and the
+  report lists every place it was said. Claims that differ in a number, date or negation are never
+  merged.
+* **Transcription confidence ≠ factual confidence.** Confidence is Whisper's own estimate of how
+  well it heard the words. A claim whose every source segment is below `--speech-threshold`
+  (default 0.40) is withheld (PROCESSING_FAILED, "may have been misheard") and never searched.
+  Confidence never enters the verdict or the evidence-strength score.
+
+### Traceability
+
+Every claim in the terminal report ends with a line like
+`Spoken ~00:17.8-00:22.6 (word timing), segment 5, transcription confidence 0.94`. The JSON report
+has `traced_claims`, one entry per claim holding:
+- the statement, the transcript excerpt, start/end times and segment ids;
+- the full segment transcript and its transcription confidence;
+- how many times it was said;
+- the verdict and evidence strength;
+- the supporting and contradicting sources with their validated quotes, and how many citations
+  validation rejected.
+
+It also has the audio metadata, the language decision, every segment (with word timings), the exact
+text sent to claim extraction, segments left out by `--max-text-chars`, timings and the full shared
+fact-check report.
+
+### CPU defaults (i5-12500H, 16 GB RAM, CPU only)
+
+`base` int8 is the default. On the real 163 s English recording it ran at 0.06× real time (about
+9 s) and used under 1 GB RAM. `small` ran at 0.15× and agreed with `base` to within 4% WER. Thread
+counts were measured: the library default (`--threads 0`) was fastest (9.0 s), ahead of 4 threads
+(9.3 s), 8 (10.5 s) and 12 (11.4 s). Default limits are 60 min (`--max-duration`), 500 MB
+(`--max-file-mb`) and 30 min for decoding plus transcription (`--extract-timeout`). The fact-check
+reads the first 6,000 characters of transcript (about 6–7 minutes of speech; `--max-text-chars`, up
+to 20,000). Later segments are listed as not checked.
+
+### Evaluation (`eval/run_audio_eval.py`, measured 2026-11-18)
+
+| Set | Result (base) |
+|---|---|
+| 6 synthetic English cases (Windows voices; mp3/wav/flac/m4a/ogg/opus; numbers, dates, negation, fast speech, 10 dB noise, 20 s pause) | WER 0.000 after formatting normalisation (raw 0.094: "8,849"/"8849", "meters"/"metres", "$1.5 billion"/"1.5 billion dollars"); numbers 9/9; English identified 6/6; segment start within 0.56 s (mean 0.37 s) |
+| Silence, white noise, tones | 0 hallucinated segments (3/3) |
+| Real English (two of the user's videos, 163 s + 60 s) | English p ≥ 0.998; 100% of segments reliable; base vs small agreement WER 0.042 and 0.010 (a consistency proxy, since no human transcript exists) |
+| Real Hindi (Agni video) | Rejected as not English in 0.8 s, nothing decoded |
+| Live fact-check of the 163 s English recording | 6 claims checked with times, segments and sources: 3 SUPPORTED, 2 INSUFFICIENT EVIDENCE, 1 CONFLICTING (Queen's University 1989 vs Wikipedia's 1990); 3 more over the per-run claim limit |
+
+Offline tests: `tests/test_audio_*.py` (formats, corrupt/empty/truncated files, limits, silence and
+noise, the language policy, timestamps and word timing, claim safeguards, repeats, numbers/dates/
+negations, the reliability gate, API failures, JSON, CLI exit codes, module separation, regressions
+for the other three commands). Opt-in real-Whisper tests:
+`set FACTCHECK_AUDIO_LIVE_TESTS=1` then `python -m pytest tests/test_audio_live.py`.
+
+### Limitations
+
+- Mixed-language recordings: the language is identified once, from the opening speech. An English
+  recording with a non-English stretch is transcribed as English throughout, apart from the
+  non-Latin-script guard.
+- No speaker identification, so a quoted or rebutted statement is checked like any other.
+- Long recordings are only partly fact-checked (the character limit). The whole transcript is still
+  shown and saved.
+- Synthetic voices are cleaner than real recordings. Real-audio accuracy was measured only as
+  agreement between two Whisper sizes, not against a human transcript.
+
+| Problem | Fix |
+|---|---|
+| `the detected language is …; only English is supported` | The recording isn't English, or use `--assume-english` for misidentified accented English |
+| `looks like a video file` | Use `factcheck-video` |
+| `not a readable audio file or it is corrupted` | Re-encode the file (e.g. to MP3 or WAV) |
+| `contains no decodable audio samples` | The file is empty |
+| Transcription `no speech found` | Silence or music only; try `--no-vad` if quiet speech was filtered out |
+| Many `?` segments | Noisy audio: try `--whisper-model small` |
+| `.exe` blocked by Application Control | Use `python -m factcheck_audio` |
 
 ## Troubleshooting
 

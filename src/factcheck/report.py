@@ -87,9 +87,12 @@ def _explanation(r: ClaimResult) -> str:
                 "No single verdict is given.")
     if r.verdict == Verdict.INSUFFICIENT_EVIDENCE:
         if not (r.supporting or r.refuting or r.context):
-            if r.rejected_citations or r.evidence:
+            if r.rejected_citations:
                 return ("Sources were found, but none of the AI model's citations could be verified "
                         "against them, so no verdict was reached.")
+            if r.evidence:
+                return ("Sources were found, but none of them directly confirms or refutes the claim, so no "
+                        "verdict was reached.")
             return "No relevant evidence was found, so the claim could not be confirmed or refuted."
         return "Some evidence was found, but not enough reliable evidence to confirm or refute the claim."
     if r.verdict == Verdict.NOT_CHECKABLE:
@@ -106,6 +109,10 @@ def _failure_summary(reason: str) -> str:
     low = reason.lower()
     if low.startswith("ocr:"):
         return "the image text it comes from could not be read reliably (try a clearer image)"
+    if low.startswith("extraction:"):  # video workflow
+        return "the speech or on-screen text it comes from may have been misheard or misread"
+    if low.startswith("transcription:"):  # audio workflow
+        return "the speech it comes from may have been misheard (low transcription confidence)"
     if "budget" in low:
         return "the per-run search or model budget was used up"
     if "time limit" in low or "run time" in low:

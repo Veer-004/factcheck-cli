@@ -55,6 +55,8 @@ class PageStats(BaseModel):
     boxes_detected: int = 0
     boxes_kept: int = 0
     boxes_below_min_score: int = 0
+    boxes_filtered_noise: int = 0  # fragments removed by the English noise filter (pipeline.is_noise)
+    boxes_small_figures: int = 0  # figures in tiny text whose confidence was capped (pipeline.cap_small_figures)
     seconds: float = 0.0
     downscaled_from: Optional[tuple[int, int]] = None
 

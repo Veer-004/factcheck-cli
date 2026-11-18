@@ -3,7 +3,6 @@ from __future__ import annotations
 import pytest
 from fakes import claim_dict, ext, judgment
 
-from factcheck.config import Config
 from factcheck.models import (
     Authority,
     Checkability,
@@ -164,6 +163,57 @@ def test_quote_too_short_rejected(config):
     j = judgment([a("C1-E1", "SUPPORTS", "1889"), a("C1-E1", "IRRELEVANT", "x")])
     v = validate_judgment(j, claim(), [P1], config)
     assert not v.supporting and "too short" in v.rejected[0]
+
+
+# Table/infobox evidence (the Agni-V payload/height claims ended PROCESSING_FAILED because
+# genuine short table cells were counted as fabricated quotes).
+AGNI_HEIGHT = claim("The height of the AGNI V is 17m.", ClaimType.NUMERIC)
+AGNI_PAYLOAD = claim("The payload of the AGNI V is 1360.78 kg.", ClaimType.NUMERIC)
+INFOBOX = passage("C1-E4", "Agni-V | Type: ICBM | Mass : 50,000 kg | Length : 17.5 m | Payload : 1,650 kg | "
+                           "Range : over 5,000 km. The Agni-V is a three-stage solid-fuelled missile.")
+PROSE = passage("C1-E1", "Agni-V is a three stage missile, 17 metres tall, two metres wide and capable of "
+                         "carrying 1.5 tonne of nuclear warheads.", cluster="C1-K2")
+
+
+def test_short_verbatim_table_cells_are_not_fabrications(config):
+    # Observed: 2 good prose quotes + 2 short verbatim cells -> was fatal ("3 of 5 ... unverifiable").
+    j = judgment([a("C1-E1", "SUPPORTS", "Agni-V is a three stage missile, 17 metres tall, two metres wide"),
+                  a("C1-E4", "SUPPORTS", "Length : 17.5 m"),
+                  a("C1-E9", "SUPPORTS", "17.5 m (Agni-V)")])  # unknown ID: still a fabrication
+    v = validate_judgment(j, AGNI_HEIGHT, [PROSE, INFOBOX], config)
+    assert v.ok, v.fatal  # 1 fabrication of 3 considered: below the fatal ratio
+    assert len(v.supporting) == 1 and v.supporting[0].evidence_id == "C1-E1"
+    # "Length : 17.5 m" is in the passage but does not support a 17 m height (figure / label mismatch)
+    assert any(r.startswith("C1-E4:") and "fabricat" not in r for r in v.rejected)
+
+
+def test_labelled_table_figure_can_support_a_numeric_claim(config):
+    c = claim("The Agni-V missile has a payload of 1,650 kg.", ClaimType.NUMERIC)
+    v = validate_judgment(judgment([a("C1-E4", "SUPPORTS", "Payload : 1,650 kg")]), c, [INFOBOX], config)
+    assert len(v.supporting) == 1, v.rejected
+
+
+def test_labelled_table_figure_can_refute_with_an_explicit_comparison(config):
+    nc = dict(claim_value=1360.78, evidence_value=1650, same_entity=True, same_metric=True, same_unit=True,
+              same_scope=True, same_period=True)
+    v = validate_judgment(judgment([a("C1-E4", "REFUTES", "Payload : 1,650 kg", numeric_comparison=nc)]),
+                          AGNI_PAYLOAD, [INFOBOX], config)
+    assert len(v.refuting) == 1, v.rejected
+    # without the comparison the usual numeric safeguard still rejects it
+    v = validate_judgment(judgment([a("C1-E4", "REFUTES", "Payload : 1,650 kg")]), AGNI_PAYLOAD, [INFOBOX], config)
+    assert not v.refuting and "lacks an explicit figure comparison" in v.rejected[0]
+
+
+def test_short_quote_without_label_or_shared_term_is_still_rejected(config):
+    for quote in ("1,650 kg", "50,000 kg", "Mass : 50,000 kg"):  # no term shared with a payload claim
+        v = validate_judgment(judgment([a("C1-E4", "SUPPORTS", quote)]), AGNI_PAYLOAD, [INFOBOX], config)
+        assert not v.supporting and "too short" in v.rejected[0], quote
+        assert v.ok  # a verbatim short quote is weak, not fabricated
+
+
+def test_short_quote_not_in_passage_is_still_a_fabrication(config):
+    v = validate_judgment(judgment([a("C1-E4", "SUPPORTS", "Payload : 1,360 kg")]), AGNI_PAYLOAD, [INFOBOX], config)
+    assert not v.ok and "verbatim" in v.rejected[0]
 
 
 def test_empty_assessments_are_fatal(config):

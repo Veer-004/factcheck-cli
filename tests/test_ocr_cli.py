@@ -64,7 +64,8 @@ def test_min_score_filters_and_counts():
 
 def test_coordinates_are_mapped_back_to_original_scale():
     raw = EngineOutput(boxes=[RawBox("x", 0.9, rect(10, 20, 30, 40))])
-    blocks, _, _ = process_boxes(raw, scale=0.5, min_score=0.0, layout="none")
+    # "x" is placeholder text (a lone letter the noise filter would drop); this test is about coordinates
+    blocks, _, _ = process_boxes(raw, scale=0.5, min_score=0.0, layout="none", noise_filter=False)
     assert blocks[0].bbox == (20.0, 40.0, 60.0, 80.0)
 
 

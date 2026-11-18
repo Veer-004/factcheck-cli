@@ -71,7 +71,3 @@ class CreditBudget:
                 return False
             self.used += n
             return True
-
-    def refund(self, n: int) -> None:
-        with self._lock:
-            self.used = max(0, self.used - n)

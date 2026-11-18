@@ -157,6 +157,7 @@ def verify_image(
     layout: str = "auto",
     model_size: str = "small",
     allow_download: bool = False,
+    noise_filter: bool = True,
 ) -> ImageReport:
     """OCR ``path`` and fact-check the recognised text.
 
@@ -169,7 +170,7 @@ def verify_image(
         raise InputError("OCR threshold must be between 0 and 1")
     try:
         engine = engine or create_engine(engine_name, model_size=model_size, allow_download=allow_download)
-        page = ocr_image(path, engine, min_score=min_score, layout=layout)
+        page = ocr_image(path, engine, min_score=min_score, layout=layout, noise_filter=noise_filter)
     except ImageInputError as exc:
         raise InputError(str(exc)) from None
     except EngineUnavailable as exc:
@@ -275,7 +276,7 @@ def run_fact_check(args: argparse.Namespace) -> int:
             raise InputError(f"--json-out points to a directory: {args.json_out}")
         ir = verify_image(args.images[0], config, engine_name=args.engine, ocr_threshold=args.ocr_threshold,
                           min_score=args.min_score, layout=args.layout, model_size=args.model_size,
-                          allow_download=args.allow_download)
+                          allow_download=args.allow_download, noise_filter=not getattr(args, "keep_noise", False))
     except (InputError, ConfigError) as exc:
         print(f"error: {redact_secrets(str(exc))}", file=sys.stderr)
         return EXIT_INVALID

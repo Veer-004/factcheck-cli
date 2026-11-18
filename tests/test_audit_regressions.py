@@ -8,7 +8,6 @@ from __future__ import annotations
 from datetime import date
 
 import pytest
-from conftest import load_page
 from fakes import FakeSearch, FakeLLM, claim_dict, extraction, result, rule_judge
 
 from factcheck.config import Config
@@ -341,3 +340,23 @@ def test_report_distinguishes_rejected_citations_from_no_evidence():
                    claims=[ClaimResult(**base)])
     assert "none of the AI model's citations could be verified" in " ".join(render_text(rejected).split())
     assert "No relevant evidence was found" in render_text(empty)
+
+
+def test_report_does_not_blame_citations_when_none_were_rejected():
+    # Observed on a real podcast: 12 sources read, the judge found none of them on point and
+    # rejected nothing; the old wording suggested the model's citations had failed validation.
+    from factcheck.models import ClaimResult, EvidencePassage, Report, SummaryLabel
+    from factcheck.report import render_text
+
+    passage = EvidencePassage(evidence_id="C1-E1", url="https://a.example/x", domain="a.example",
+                              text="Gratitude may improve immune function.", cluster_id="C1-K1")
+    r = ClaimResult(claim_id="C1", index=1, statement="s", source_excerpt="s", claim_type=ClaimType.FACTUAL,
+                    checkability=Checkability.CHECKABLE, verdict=Verdict.INSUFFICIENT_EVIDENCE, score=0,
+                    evidence=[passage])
+    text = " ".join(render_text(Report(input_chars=1, summary_label=SummaryLabel.PARTIALLY_RESOLVED,
+                                       summary_text="", claims=[r])).split())
+    assert "none of them directly confirms or refutes the claim" in text
+    assert "citations could be verified" not in text
+    both = r.model_copy(update={"rejected_citations": 2})
+    assert "citations could be verified" in " ".join(render_text(Report(
+        input_chars=1, summary_label=SummaryLabel.PARTIALLY_RESOLVED, summary_text="", claims=[both])).split())

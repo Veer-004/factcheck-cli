@@ -1,0 +1,40 @@
+{"a": "The Eiffel Tower was completed in 1889.", "b": "The Eiffel Tower was completed in 1889", "dup": true, "kind": "punctuation"}
+{"a": "Water boils at 100 degrees Celsius at sea level.", "b": "WATER BOILS AT 100 DEGREES CELSIUS AT SEA LEVEL", "dup": true, "kind": "case"}
+{"a": "Mount Everest is 8,849 metres tall.", "b": "Mount Everest is 8849 metres tall.", "dup": true, "kind": "number format"}
+{"a": "India has a population of over 1.4 billion people.", "b": "India has a population of over 1.4 billion people", "dup": true, "kind": "punctuation"}
+{"a": "The Amazon rainforest produces about 20 percent of the world's oxygen.", "b": "The Amazon rainforest produces about 20% of the world's oxygen.", "dup": true, "kind": "percent sign"}
+{"a": "Light travels at about 300,000 km per second.", "b": "Light travels at about 300,000 kilometres per second.", "dup": true, "kind": "unit spelling"}
+{"a": "The Great Wall of China is more than 21,000 km long.", "b": "The Great Wall of China is more than 21,000 km long!", "dup": true, "kind": "punctuation"}
+{"a": "The human body has 206 bones in total.", "b": "The adult human body has 206 bones in total.", "dup": false, "kind": "scope word (adult)"}
+{"a": "Honey never spoils if stored properly in sealed containers.", "b": "Honey never spoils if it is stored properly in sealed containers.", "dup": true, "kind": "function words"}
+{"a": "The Pacific Ocean is the largest ocean on Earth.", "b": "The Pacific Ocean is the largest ocean on the planet Earth.", "dup": true, "kind": "extra non-critical word"}
+{"a": "The Great Wall of China is visible from the Moon.", "b": "The Great Wall of China is not visible from the Moon.", "dup": false, "kind": "negation"}
+{"a": "Vaccines cause autism.", "b": "Vaccines do not cause autism.", "dup": false, "kind": "negation"}
+{"a": "The drug is safe for children.", "b": "The drug isn't safe for children.", "dup": false, "kind": "contraction negation"}
+{"a": "The company has never made a profit.", "b": "The company has made a profit.", "dup": false, "kind": "negation (never)"}
+{"a": "The Eiffel Tower was completed in 1889.", "b": "The Eiffel Tower was completed in 1887.", "dup": false, "kind": "year"}
+{"a": "Inflation reached 7.5% in 2022.", "b": "Inflation reached 7.5% in 2021.", "dup": false, "kind": "year"}
+{"a": "The bridge is 3 km long.", "b": "The bridge is 3 miles long.", "dup": false, "kind": "unit"}
+{"a": "The oven heats to 200 degrees Celsius.", "b": "The oven heats to 200 degrees Fahrenheit.", "dup": false, "kind": "unit"}
+{"a": "The budget is 5 million dollars.", "b": "The budget is 5 billion dollars.", "dup": false, "kind": "scale"}
+{"a": "The budget is 5 million dollars.", "b": "The budget is 5 million euros.", "dup": false, "kind": "currency"}
+{"a": "The company employs 1,200 people.", "b": "The company employs 12,000 people.", "dup": false, "kind": "magnitude"}
+{"a": "The vote took place on 4 March 2024.", "b": "The vote took place on 4 May 2024.", "dup": false, "kind": "month (May)"}
+{"a": "The vote took place on 4 March 2024.", "b": "The vote took place on 14 March 2024.", "dup": false, "kind": "day"}
+{"a": "Paris is the capital of France.", "b": "Lyon is the capital of France.", "dup": false, "kind": "entity"}
+{"a": "The treaty was signed in Geneva by 40 countries in 1949.", "b": "The treaty was signed in Vienna by 40 countries in 1949.", "dup": false, "kind": "place"}
+{"a": "Microsoft acquired the startup for 2 billion dollars in 2021.", "b": "Google acquired the startup for 2 billion dollars in 2021.", "dup": false, "kind": "organisation (sentence-initial)"}
+{"a": "The law was passed by the Senate in 2019 with broad support from both parties.", "b": "The law was passed by the House in 2019 with broad support from both parties.", "dup": false, "kind": "institution"}
+{"a": "Sales rose after the merger.", "b": "Sales rose before the merger.", "dup": false, "kind": "temporal relation"}
+{"a": "More people voted in 2020 than in 2016.", "b": "Fewer people voted in 2020 than in 2016.", "dup": false, "kind": "comparative"}
+{"a": "Prices increased by 10 percent last year.", "b": "Prices decreased by 10 percent last year.", "dup": false, "kind": "direction"}
+{"a": "Only 3 people survived the crash.", "b": "3 people survived the crash.", "dup": false, "kind": "quantifier"}
+{"a": "All students passed the exam.", "b": "Some students passed the exam.", "dup": false, "kind": "quantifier"}
+{"a": "The airline ordered 20 A380 aircraft.", "b": "The airline ordered 20 A350 aircraft.", "dup": false, "kind": "model code"}
+{"a": "Vitamin C prevents colds.", "b": "Vitamin D prevents colds.", "dup": false, "kind": "single letter"}
+{"a": "Plan A was approved by the council.", "b": "Plan B was approved by the council.", "dup": false, "kind": "single letter"}
+{"a": "The Pacific Ocean is the largest ocean on Earth.", "b": "The Atlantic Ocean is the second largest ocean on Earth.", "dup": false, "kind": "different claim, shared words"}
+{"a": "Coffee reduces the risk of heart disease.", "b": "Coffee increases the risk of heart disease.", "dup": false, "kind": "antonym verb"}
+{"a": "The Eiffel Tower was finished in 1889.", "b": "The Eiffel Tower was completed in 1889.", "dup": true, "kind": "synonym (expected miss: kept apart, checked twice)"}
+{"a": "Bats are blind.", "b": "Bats cannot see.", "dup": true, "kind": "paraphrase (expected miss: kept apart, checked twice)"}
+{"a": "Water freezes at 0 degrees Celsius.", "b": "At 0 degrees Celsius, water freezes.", "dup": true, "kind": "reordering"}

@@ -12,4 +12,9 @@ __pycache__/
 # Generated output
 eval/results/
 eval/ocr_samples/
+eval/video_samples/
+# frames from personal videos (OCR ground-truth set; not redistributable)
+eval/ocr_real/
 report.json
+# local run outputs written with --json-out at the repo root
+/*_report.json

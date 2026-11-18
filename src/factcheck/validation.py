@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from typing import Callable, Optional
 
 from .config import Config
 from .evidence import is_recent
@@ -36,7 +37,6 @@ from .textnorm import (
     extract_numbers,
     normalize_for_match,
     number_contexts,
-    number_mentions,
     numbers_compatible,
     original_span,
     strip_quote_wrapping,
@@ -97,12 +97,28 @@ def _token_jaccard(a: str, b: str) -> float:
     return len(ta & tb) / len(ta | tb) if ta and tb else 0.0
 
 
-def validate_claims(extraction: LLMExtraction, text: str, config: Config) -> ClaimValidation:
-    """Anchor, ground, deduplicate and cap the extracted claims."""
+# (statement, source_excerpt) of an accepted claim and of a new one -> True if the new one is a duplicate.
+DuplicateCheck = Callable[[tuple[str, str], tuple[str, str]], bool]
+
+
+def default_is_duplicate(earlier: tuple[str, str], new: tuple[str, str]) -> bool:
+    """The text workflow's near-duplicate rule: similar wording and the same figures."""
+    return (_token_jaccard(earlier[0], new[0]) >= 0.8
+            and sorted(extract_numbers(earlier[0])) == sorted(extract_numbers(new[0])))
+
+
+def validate_claims(extraction: LLMExtraction, text: str, config: Config,
+                    is_duplicate: Optional[DuplicateCheck] = None) -> ClaimValidation:
+    """Anchor, ground, deduplicate and cap the extracted claims.
+
+    ``is_duplicate`` replaces the near-duplicate rule (the video workflow passes a
+    stricter one that also compares negation, names and the source excerpts).
+    """
+    is_duplicate = is_duplicate or default_is_duplicate
     result = ClaimValidation()
     input_terms = content_tokens(text)
     input_numbers = extract_numbers(text)
-    accepted: list[tuple[str, str]] = []  # (statement, claim_id)
+    accepted: list[tuple[str, str, str]] = []  # (statement, excerpt, claim_id)
     next_id = 1
 
     raw_claims = list(extraction.claims)
@@ -137,8 +153,7 @@ def validate_claims(extraction: LLMExtraction, text: str, config: Config) -> Cla
         if len(stmt_terms & input_terms) / len(stmt_terms) < 0.6:
             drop("statement wording is not grounded in the input")
             continue
-        dup = next((cid for s, cid in accepted if _token_jaccard(s, statement) >= 0.8
-                    and sorted(extract_numbers(s)) == sorted(stmt_numbers)), None)
+        dup = next((cid for s, e, cid in accepted if is_duplicate((s, e), (statement, excerpt))), None)
         if dup:
             drop(f"near-duplicate of {dup}")
             continue
@@ -172,7 +187,7 @@ def validate_claims(extraction: LLMExtraction, text: str, config: Config) -> Cla
             fallback_queries=fallback,
         )
         next_id += 1
-        accepted.append((statement, claim.claim_id))
+        accepted.append((statement, excerpt, claim.claim_id))
         (result.checkable if is_checkable else result.not_checkable).append(claim)
     return result
 
@@ -251,6 +266,12 @@ def figure_agrees(claim_value: float, qualifier: str, evidence_value: float) -> 
 
 _DEBUNK = re.compile(r"\b(myth|debunked|false|untrue|hoax|misconception|incorrect|inaccurate|not true|no evidence)\b", re.I)
 _MIN_QUOTE_CHARS = 20
+_MIN_LABELLED_CHARS = 8  # shortest table/infobox quote accepted as a labelled figure
+_UNIT_WORDS = frozenset(
+    """kgs mph kmh kph lbs usd eur gbp inr cent percent metre meter metres meters kilometre kilometer
+    kilometres kilometers mile miles kilogram kilograms tonne tonnes ton tons gram grams litre liter litres
+    liters second seconds minute minutes hour hours year years feet foot inch inches celsius fahrenheit
+    dollar dollars euro euros rupee rupees pound pounds degree degrees""".split())
 _FABRICATION = "fabrication"
 
 
@@ -269,16 +290,37 @@ class JudgmentValidation:
         return not self.fatal
 
 
+def _labelled_figure(quote: str, claim: Claim) -> bool:
+    """A short quote that is a labelled figure from a table or infobox ("Payload : 1,650 kg").
+
+    It must have a figure, a word, and share a subject term with the claim, so a bare
+    number ("1889") or an unrelated cell never qualifies. The usual figure checks
+    still apply afterwards.
+    """
+    shared = {t for t in subject_tokens(claim.statement) & content_tokens(quote)
+              if len(t) >= 3 and t.isalpha() and t not in _UNIT_WORDS}  # a shared unit ("kg") is not a label
+    return (len(normalize_for_match(quote)) >= _MIN_LABELLED_CHARS
+            and bool(extract_numbers(quote))
+            and bool(shared))
+
+
 def _check_assessment(a: LLMAssessment, claim: Claim, passage: EvidencePassage) -> tuple[str | None, str, Directness]:
-    """Return (rejection_reason or None, rejection_kind, effective directness)."""
+    """Return (rejection_reason or None, rejection_kind, effective directness).
+
+    Only quotes that are not in the passage count as fabrications (the kind that can
+    void a whole judgment). A short quote that *is* in the passage is a weak citation,
+    rejected unless it is a labelled figure; table and infobox cells are short by nature.
+    """
     quote = strip_quote_wrapping(a.quote or "")
     nq = normalize_for_match(quote)
-    if len(nq) < _MIN_QUOTE_CHARS or len(nq.split()) < 4:
-        return "quote is too short to verify", _FABRICATION, a.directness
+    if not nq:
+        return "quote is empty", _FABRICATION, a.directness
     if len(quote) > len(passage.text):
         return "quote is longer than the passage", _FABRICATION, a.directness
     if not contains_normalized(passage.text, quote):
         return "quote does not appear verbatim in the cited passage", _FABRICATION, a.directness
+    if (len(nq) < _MIN_QUOTE_CHARS or len(nq.split()) < 4) and not _labelled_figure(quote, claim):
+        return "quote is too short to verify", "short", a.directness
 
     claim_terms = subject_tokens(claim.statement)
     quote_terms = content_tokens(quote)

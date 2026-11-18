@@ -41,7 +41,6 @@ from .llm import (
     LLMUnavailableError,
 )
 from .models import (
-    Checkability,
     Claim,
     ClaimResult,
     DroppedClaim,
@@ -59,6 +58,7 @@ from .retrieval import RetrievalService, SearchAuthError, SearchProvider, Tavily
 from .scoring import compute_strengths, score_claim
 from .security import make_boundary, redact_secrets
 from .validation import (
+    DuplicateCheck,
     JudgmentValidation,
     validate_claims,
     validate_correction,
@@ -81,9 +81,10 @@ class Deps:
     config: Config
     deadline: Deadline
     boundary: str
-    # Optional hooks for other input workflows (image/OCR). The text workflow sets neither.
+    # Optional hooks for other input workflows (image/OCR, video, audio). The text workflow sets none.
     source_note: Optional[str] = None  # extra instruction about the input's origin (extraction user prompt)
     claim_gate: Optional[ClaimGate] = None  # reason to withhold a checkable claim before retrieval, or None
+    duplicate_check: Optional[DuplicateCheck] = None  # replaces the near-duplicate rule (video workflow)
 
 
 # --------------------------------------------------------------------------
@@ -396,7 +397,7 @@ def build_graph(deps: Deps):
         raise RunFailure(f"claim extraction returned malformed output twice: {last_error}")
 
     def validate_claims_node(state: MainState) -> dict[str, Any]:
-        cv = validate_claims(state["extraction"], state["text"], cfg)
+        cv = validate_claims(state["extraction"], state["text"], cfg, deps.duplicate_check)
         warnings = []
         if cv.dropped:
             warnings.append(f"{len(cv.dropped)} extracted claim(s) dropped by validation")
@@ -553,8 +554,10 @@ def run_pipeline(
     *,
     source_note: str | None = None,
     claim_gate: ClaimGate | None = None,
+    duplicate_check: DuplicateCheck | None = None,
 ) -> Report:
-    """The shared pipeline behind :func:`verify_text` and ``factcheck.image.verify_image``."""
+    """The shared pipeline behind :func:`verify_text`, ``factcheck.image.verify_image`` and
+    ``factcheck_video.pipeline.verify_video``."""
     config = config or Config.from_env()
     text = validate_input(text, config)
     deadline = Deadline(config.run_timeout_s)
@@ -577,6 +580,7 @@ def run_pipeline(
         boundary=make_boundary(),
         source_note=source_note,
         claim_gate=claim_gate,
+        duplicate_check=duplicate_check,
     )
     graph = build_graph(deps)
     started = time.monotonic()

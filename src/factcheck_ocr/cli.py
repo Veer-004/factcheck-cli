@@ -53,6 +53,8 @@ def _parser() -> argparse.ArgumentParser:
                         "misreads outlined meme text; the paddle engines always use their own classifier)")
     p.add_argument("--allow-download", action="store_true",
                    help="allow a one-time model download (rapid medium about 130 MB; paddle engines 140-400 MB)")
+    p.add_argument("--keep-noise", action="store_true",
+                   help="keep fragments the English noise filter would remove (stray letters, non-Latin symbols)")
     p.add_argument("--json-out", type=Path, help="also write full results (boxes, scores, blocks) as JSON")
     fc = p.add_argument_group(
         "image fact-checking",
@@ -152,7 +154,8 @@ def main(argv: list[str] | None = None) -> int:
     code = EXIT_OK
     for path in args.images:
         try:
-            page = ocr_image(path, engine, min_score=args.min_score, layout=args.layout, max_side=args.max_side)
+            page = ocr_image(path, engine, min_score=args.min_score, layout=args.layout, max_side=args.max_side,
+                             noise_filter=not args.keep_noise)
         except ImageInputError as exc:
             print(f"error: {exc}", file=sys.stderr)
             errors.append({"source": path.name, "error": str(exc)})
