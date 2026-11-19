@@ -31,7 +31,8 @@ python -m venv .venv
 
 On macOS/Linux use `.venv/bin/python` instead. The install provides the `factcheck` command
 (`.venv\Scripts\factcheck.exe`). `python -m factcheck` also works. The other three commands are
-`factcheck-ocr` (images), `factcheck-video` and `factcheck-audio`. Each has its own section below.
+`factcheck-ocr` (images), `factcheck-video` and `factcheck-audio`. Each has its own section below,
+and so does the REST API (`factcheck_api`) that serves all four.
 
 Dependencies: `langgraph`, `pydantic`, `google-genai`, `tavily-python` (+ `pytest` for dev).
 
@@ -1043,6 +1044,222 @@ for the other three commands). Opt-in real-Whisper tests:
 | Transcription `no speech found` | Silence or music only; try `--no-vad` if quiet speech was filtered out |
 | Many `?` segments | Noisy audio: try `--whisper-model small` |
 | `.exe` blocked by Application Control | Use `python -m factcheck_audio` |
+
+## REST API (`factcheck_api`, FastAPI)
+
+A backend for a future web frontend: the same four modules behind REST endpoints. It returns
+structured JSON, not HTML. There is no database, no accounts and no stored history. Each request is
+processed and answered, and uploaded files are deleted straight away.
+
+### Architecture
+
+```
+HTTP request
+  -> routes.py     API layer: endpoints, request validation (Pydantic), threadpool offloading
+  -> uploads.py    streamed upload to a private temp dir: extension + content-type + size checks
+  -> services.py   integration layer: calls verify_text / verify_image / verify_video / verify_audio
+                   with the same defaults as the CLIs; maps module exceptions to HTTP errors
+  -> responses.py  response layer: module report -> FactCheckResponse (schemas.py)
+config.py (FACTCHECK_API_* settings) · errors.py (one JSON error shape) · app.py (FastAPI app, CORS)
+```
+
+The modules are called as Python functions; nothing goes through a subprocess or the CLI. Claims,
+evidence, validation and verdicts all come from the shared engine unchanged. The API only arranges
+the module's report into a common shape and also returns the complete report.
+
+### Install and run
+
+```bash
+.venv\Scripts\python.exe -m pip install -e ".[api,ocr,video,audio]"
+```
+```bash
+.venv\Scripts\python.exe -m uvicorn factcheck_api.app:app --reload
+```
+
+`python -m factcheck_api --reload` does the same; `--host` and `--port` are optional. Swagger UI is
+at **http://127.0.0.1:8000/docs**, ReDoc at `/redoc` and the OpenAPI schema at `/openapi.json`.
+The API keys and fact-check settings are the ones the CLIs use (`GEMINI_API_KEY`, `TAVILY_API_KEY`,
+`FACTCHECK_*`, the `.env` file). The API reads them when the server starts.
+
+API-only settings (all optional; see `.env.example`):
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `FACTCHECK_API_CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173` | Comma-separated browser origins. `*` is refused, and credentials are never allowed |
+| `FACTCHECK_API_MAX_IMAGE_MB` | 25 | Image upload limit (at most 25, the OCR module's own limit) |
+| `FACTCHECK_API_MAX_VIDEO_MB` / `_AUDIO_MB` | 500 / 500 | Video / audio upload limits (the modules' defaults) |
+| `FACTCHECK_API_MAX_TEXT_CHARS` | 20000 | Request-size guard for text. The engine still applies its own 4,000-character limit (400) |
+| `FACTCHECK_API_MEDIA_CONCURRENCY` | 1 | Video + audio jobs processed at the same time (the rest wait) |
+| `FACTCHECK_API_IMAGE_CONCURRENCY` / `_TEXT_CONCURRENCY` | 2 / 4 | Same for images / text |
+| `FACTCHECK_API_TEMP_DIR` | system temp | Where uploads are stored while processed |
+
+### Endpoints
+
+| Method | Path | Body | What it runs |
+|---|---|---|---|
+| GET | `/health` | none | Module dependencies installed? Credentials configured? (presence only; no external call) |
+| POST | `/api/v1/fact-check/text` | JSON `{"text": "...", "max_claims": 6, "search_budget": 40}` (only `text` is required) | `verify_text` (as `factcheck`) |
+| POST | `/api/v1/fact-check/image` | multipart `file` (+ optional `max_claims`, `search_budget`) | `verify_image` (as `factcheck-ocr --fact-check`) |
+| POST | `/api/v1/fact-check/video` | multipart `file` (+ options) | `verify_video` (as `factcheck-video`) |
+| POST | `/api/v1/fact-check/audio` | multipart `file` (+ options) | `verify_audio` (as `factcheck-audio`) |
+
+Supported uploads:
+
+| Type | Extensions |
+|---|---|
+| Image | png, jpg/jpeg, webp, bmp, tif/tiff, gif |
+| Video | mp4, m4v, mov, mkv, webm, avi, mpg/mpeg, ts, 3gp, wmv, flv |
+| Audio | mp3, wav, m4a/m4b, aac, flac, ogg/oga, opus, wma, aif/aiff/aifc, amr, mka, weba, caf, ac3, mp2 |
+
+The declared content type must be in that type's family (`image/*`, `video/*`, `audio/*`) or
+`application/octet-stream`.
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/fact-check/text -H "Content-Type: application/json" -d "{\"text\": \"Water boils at 50 degrees Celsius at sea level.\"}"
+```
+```bash
+curl -X POST http://127.0.0.1:8000/api/v1/fact-check/audio -F "file=@podcast.mp3" -F "max_claims=3"
+```
+
+### Response (`FactCheckResponse`, the same for all four)
+
+Excerpt of a real text response (one claim, one of its citations):
+
+```json
+{
+  "status": "completed",
+  "input_type": "text",
+  "filename": null,
+  "summary": {"label": "CONTAINS_FALSE_CLAIMS", "text": "At least one claim is contradicted by the retrieved evidence. (2 claim(s): 1 refuted, 1 supported.)",
+              "total_claims": 2, "supported": 1, "refuted": 1, "misleading": 0, "conflicting": 0,
+              "insufficient_evidence": 0, "not_checkable": 0, "retrieval_failed": 0, "processing_failed": 0,
+              "over_limit_claims": 0, "dropped_claims": 0},
+  "claims": [{
+    "claim_id": "C2",
+    "claim": "Water boils at 50 degrees Celsius at sea level.",
+    "source_excerpt": "Water boils at 50 degrees Celsius at sea level.",
+    "verdict": "REFUTED",
+    "evidence_score": 100,
+    "explanation": "The retrieved evidence contradicts this claim (4 independent sources).",
+    "correction": "Water boils at 100 degrees Celsius at sea level under standard atmospheric pressure.",
+    "citations": [{"role": "refuting", "evidence_id": "C2-E1", "url": "https://terpconnect.umd.edu/~wbreslyn/chemistry/pressure/boiling-point.html",
+                   "title": "Boiling Point", "quote": "For example, for water, the boiling point is 100 degrees Celsius at a pressure of 1 atm.",
+                   "stance": "REFUTES", "directness": "EXPLICIT", "authority": "PRIMARY", "weight": 1.0, "...": "..."}],
+    "citation_validation": {"rejected_citations": 2, "sources_considered": 6, "retrieval_rounds": 1, "search_credits": 3},
+    "timestamps": [],
+    "provenance": null
+  }],
+  "dropped_claims": [], "over_limit_claims": [], "not_checked_reason": null,
+  "warnings": [], "notes": ["Evidence score: experimental rubric; not a probability and not calibrated."],
+  "processing_seconds": 16.72,
+  "report": {"...": "the complete module report, as written by --json-out"}
+}
+```
+
+A claim from the audio endpoint carries its spoken location (real response):
+
+```json
+"timestamps": [{"modality": "speech", "start": 12.48, "end": 19.7, "word_level": true,
+                "text": "... if we practice gratitude 10 minutes a day In just about four days of our immunity system gets 50% better.",
+                "confidence": 0.733, "reliable": true, "segment_ids": [2, 3], "observation_id": null, "frame_times": []}]
+```
+
+How each field behaves:
+- `verdict`, `evidence_score`, `explanation`, `correction`, citations and validation counts are copied
+  from the module report. The explanation is the CLI sentence word for word.
+- `timestamps` holds every place the claim was spoken (`speech`) or shown (`screen`, video only),
+  with segment ids, on-screen text-block id, sampled frame times and recognition confidence. It is
+  `[]` for text and image.
+- `provenance` depends on the input: image gives OCR lines, blocks and OCR confidence; video and
+  audio give the module's claim source, including merged duplicates. It is `null` for text.
+- `report` is the module's complete JSON report (the same as `--json-out`): the full transcript,
+  OCR text and observations, evidence passages, statistics and so on. The only change is that
+  temporary paths are replaced by the uploaded file's name.
+- `status` is `completed` when the fact-check ran, whatever the verdicts. It is `not_checked` when
+  the input was processed but nothing could be checked (no text or speech, not English, everything
+  below the recognition threshold); `not_checked_reason` says why. Both are HTTP 200.
+  INSUFFICIENT_EVIDENCE and PROCESSING_FAILED are verdicts, not HTTP errors.
+- Recognition confidence (OCR or speech) is not factual confidence and is not part of
+  `evidence_score`.
+
+### Errors
+
+Every error has the same shape: `{"status": "error", "error": {"code", "message", "details"},
+"request_id"}`. The `request_id` is also sent in the `X-Request-ID` header and appears in the server
+log. Messages never contain API keys, environment variables, file paths or stack traces; unexpected
+exceptions are logged in full on the server and return a generic message.
+
+| HTTP | `code` | When |
+|---|---|---|
+| 400 | `invalid_input` | Whitespace-only text, text over the engine's 4,000 characters, a corrupted or unreadable file, media over the duration limit |
+| 400 | `empty_file` | Zero-byte upload |
+| 413 | `file_too_large` / `text_too_large` | Over the configured limit (checked from `Content-Length` before the body is read, and again while copying) |
+| 415 | `unsupported_media_type` | Extension or content type not supported for that endpoint |
+| 422 | `validation_error` | Missing `file` or `text`, empty `text`, malformed JSON, option out of range; `details` lists the fields |
+| 404 / 405 | `not_found` / `method_not_allowed` | Unknown path / wrong method |
+| 500 | `processing_failed` | OCR or transcription failure, graph step limit |
+| 500 | `internal_error` | Unexpected exception |
+| 503 | `service_not_configured` | Gemini/Tavily keys missing on the server |
+| 503 | `external_service_error` | Gemini/Tavily authentication failure, or the language model failed |
+| 503 | `dependency_unavailable` | Speech/OCR package or model not installed |
+
+### Long-running requests
+
+Processing runs in worker threads, so the event loop keeps serving `/health` and other requests.
+Each response is the completed result: there is no job queue or polling, and no partial results.
+Times measured on a laptop CPU (i5-12500H) with live APIs:
+
+| Input | Time |
+|---|---|
+| Text, 2 claims | about 17 s |
+| Image | about 15 s |
+| 60 s video | about 57 s |
+| 6 min audio | about 38 s |
+
+Video and audio share `FACTCHECK_API_MEDIA_CONCURRENCY` (default 1). Further media requests wait in
+line, and waiting counts toward the client's timeout.
+
+Limitations:
+- **Timeouts.** The modules enforce their own limits: fact-check 180 s, video extraction 900 s,
+  audio transcription 1,800 s. A long video can therefore need about 18 minutes, longer than many
+  reverse proxies and browsers wait by default (often 60 s). Raise the proxy's read timeout (e.g.
+  nginx `proxy_read_timeout`) and body-size limit (`client_max_body_size`) to match, or keep uploads
+  short. If processing still has to outlive HTTP, the next step would be a job endpoint with
+  polling; it isn't built because current processing times fit in one request.
+- **Disconnects.** A started job is not stopped when the client disconnects. It finishes in the
+  background, its result is discarded, and the upload is deleted only once it ends.
+- **Upload copies.** Starlette buffers large uploads in its own temporary file before the endpoint
+  runs, so a request briefly uses about twice its size in disk space. A request without
+  `Content-Length` (chunked) is size-checked during the copy instead.
+- **Models.** Speech and OCR models load on every request: about 0.4 s for Whisper base and about
+  1 s for RapidOCR.
+- **No authentication or rate limiting.** Put the API behind a proxy, or keep it local, before
+  exposing it publicly. Every request spends Gemini/Tavily quota.
+
+Tests: `tests/test_api.py` runs fully offline with fake providers and fake models. It covers every
+endpoint, validation, unsupported, oversized and corrupted uploads, temp-file cleanup after success
+and failure, the error shape, citation and timestamp preservation, INSUFFICIENT_EVIDENCE as a 200,
+CORS, and that the CLIs never import FastAPI. An opt-in live smoke test:
+`set FACTCHECK_LIVE_TESTS=1` then `python -m pytest tests/test_api_live.py`.
+
+## Web frontend (`frontend/`)
+
+A React + TypeScript website for the REST API: a landing page, one workspace for all four input types,
+and an interactive report with OCR boxes over the image, a claim timeline and seekable transcript for
+video and audio, and clickable sources. Start the API as above, then:
+
+```bash
+cd frontend
+```
+```bash
+npm install
+```
+```bash
+npm run dev
+```
+
+Open http://127.0.0.1:5173. Setup, configuration (`VITE_API_BASE_URL`) and design notes are in
+[frontend/README.md](frontend/README.md).
 
 ## Troubleshooting
 

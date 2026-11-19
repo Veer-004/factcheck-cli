@@ -30,6 +30,9 @@ video = ["faster-whisper>=1.2,<2", "av>=14", "rapidocr>=3.10,<4", "onnxruntime>=
 # Audio fact-checking (factcheck-audio): local English speech-to-text only (no OCR). Reuses the video
 # module's Whisper and decoding code, which needs only these packages.
 audio = ["faster-whisper>=1.2,<2", "av>=14", "numpy>=1.24"]
+# REST API (factcheck_api): FastAPI + Uvicorn; python-multipart parses file uploads. Install together
+# with the extras of the modules you want to serve, e.g. pip install -e ".[api,video,audio]".
+api = ["fastapi>=0.115,<1", "uvicorn>=0.30", "python-multipart>=0.0.9"]
 
 [project.scripts]
 factcheck = "factcheck.cli:main"
