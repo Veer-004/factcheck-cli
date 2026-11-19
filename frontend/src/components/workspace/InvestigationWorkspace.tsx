@@ -1,7 +1,9 @@
 import { AnimatePresence, motion } from "framer-motion";
 import type { Health } from "../../hooks/useHealth";
 import type { Inputs, Investigation } from "../../hooks/useInvestigation";
+import { useRunPlan } from "../../hooks/useRunPlan";
 import { MAX_TEXT_CHARS, type MediaMode, type Mode } from "../../lib/config";
+import type { RunOptions, RunPlan } from "../../lib/types";
 import { ScrambleText } from "../fx/TextFx";
 import { InvestigationReport } from "../report/InvestigationReport";
 import { BackendStatus } from "./BackendStatus";
@@ -10,6 +12,7 @@ import { FileUpload } from "./FileUpload";
 import { InvestigationLoader } from "./InvestigationLoader";
 import { ModalitySelector } from "./ModalitySelector";
 import { MODE_BY_ID } from "./modes";
+import { RunSettings } from "./RunSettings";
 import { TextInput } from "./TextInput";
 import { VerifyButton } from "./VerifyButton";
 
@@ -19,7 +22,7 @@ interface Props {
   inputs: Inputs;
   setInputs: (f: (i: Inputs) => Inputs) => void;
   investigation: Investigation;
-  onVerify: () => void;
+  onVerify: (options?: RunOptions, plan?: RunPlan | null) => void;
   onStopWaiting: () => void;
   onReset: () => void;
   health: Health;
@@ -41,6 +44,8 @@ export function InvestigationWorkspace(p: Props) {
   const running = inv.phase === "running";
   const problem = readiness(p.mode, p.inputs);
   const view = inv.phase === "idle" ? "input" : inv.phase;
+  const run = useRunPlan(p.mode, p.inputs.text, p.mode === "text" ? null : p.inputs.files[p.mode],
+                         p.mode === "text" ? null : p.inputs.durations[p.mode], !problem);
 
   return (
     <main className="mx-auto max-w-5xl px-4 pb-24 pt-28 sm:px-8">
@@ -88,7 +93,8 @@ export function InvestigationWorkspace(p: Props) {
                   }))}
                 />
               )}
-              <VerifyButton label={MODE_BY_ID[p.mode].verb} onClick={p.onVerify} disabled={!!problem || running} busy={running}
+              {!problem && <RunSettings run={run} mode={p.mode} disabled={running} />}
+              <VerifyButton label={MODE_BY_ID[p.mode].verb} onClick={() => p.onVerify(run.options, run.usedPlan)} disabled={!!problem || running} busy={running}
                             hint={problem ?? (p.health.state === "offline" ? "The server looks offline; verification will fail until it is running." : null)} />
             </motion.section>
           )}
@@ -99,7 +105,7 @@ export function InvestigationWorkspace(p: Props) {
           )}
 
           {inv.phase === "error" && (
-            <ErrorState key="error" error={inv.error} onRetry={p.onVerify} onEdit={p.onReset} />
+            <ErrorState key="error" error={inv.error} onRetry={() => p.onVerify(run.options, run.usedPlan)} onEdit={p.onReset} />
           )}
 
           {inv.phase === "done" && (

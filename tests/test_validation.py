@@ -16,7 +16,7 @@ from factcheck.models import (
 from factcheck.textnorm import extract_numbers, normalize_for_match, numbers_compatible
 from factcheck.validation import (
     InputError,
-    claim_figures,
+    classified_claim_figures,
     validate_claims,
     validate_correction,
     validate_input,
@@ -70,8 +70,8 @@ def test_numbers_compatible_rounding_and_approximation():
 
 
 def test_claim_figures_qualifiers():
-    figs = claim_figures("More than 3 million people and about 45% of voters, under 10 cities, exactly 7 days")
-    assert [q for _, q in figs] == ["min", "approx", "max", "exact"]
+    figs = classified_claim_figures("More than 3 million people and about 45% of voters, under 10 cities, exactly 7 days")
+    assert [q for _, q, _kind in figs] == ["min", "approx", "max", "exact"]
 
 
 # --------------------------------------------------------------------------- claims
@@ -366,3 +366,63 @@ def test_no_correction_for_supported_or_missing(config):
     assert validate_correction(LLMCorrection(text="x", evidence_ids=["C1-E1"]), REF_CLAIM, Verdict.SUPPORTED, v, [REF_P]) == (None, None)
     text, note = validate_correction(None, REF_CLAIM, Verdict.REFUTED, v, [REF_P])
     assert text is None and note.startswith("No correction could be established")
+
+
+# --------------------------------------------------------------------------- fair claim limit
+
+FIVE_FACTS = (
+    "1. Hippos cannot swim. Because their bones are extremely dense and heavy, they walk along the riverbed.\n"
+    "2. The Eiffel Tower grows taller in the summer. Heat causes the iron structure to expand.\n"
+    "3. Honey never spoils. Sealed jars of honey remain edible for thousands of years.\n"
+    "4. Wombats produce cube-shaped poop. They are the only known animals on Earth to do so.\n"
+    "5. Sharks are older than trees. Sharks have existed for around 400 million years.\n"
+)
+FIVE_FACT_CLAIMS = [
+    ("Hippos cannot swim.", "Hippos cannot swim."),
+    ("Hippos have extremely dense and heavy bones.", "their bones are extremely dense and heavy"),
+    ("The Eiffel Tower grows taller in the summer.", "The Eiffel Tower grows taller in the summer."),
+    ("Heat causes the iron structure of the Eiffel Tower to expand.", "Heat causes the iron structure to expand."),
+    ("Honey never spoils.", "Honey never spoils."),
+    ("Sealed jars of honey remain edible for thousands of years.", "Sealed jars of honey remain edible for thousands of years."),
+    ("Wombats produce cube-shaped poop.", "Wombats produce cube-shaped poop."),
+    ("Wombats are the only known animals on Earth to produce cube-shaped poop.", "They are the only known animals on Earth to do so."),
+    ("Sharks are older than trees.", "Sharks are older than trees."),
+    ("Sharks have existed for around 400 million years.", "Sharks have existed for around 400 million years."),
+]
+
+
+def test_claim_limit_gives_every_input_item_a_turn(config):
+    """Regression: with 6 slots the first three facts used to take all of them (main + detail),
+    so the wombat and shark facts were never checked."""
+    raw = ext(*(claim_dict(s, e) for s, e in FIVE_FACT_CLAIMS))
+    cv = validate_claims(raw, FIVE_FACTS, config.model_copy(update={"max_checkable_claims": 6}))
+    kept = [c.statement for c in cv.checkable]
+    assert len(kept) == 6
+    for topic in ("Hippos", "Eiffel", "Honey", "Wombats", "Sharks"):
+        assert any(topic.lower() in s.lower() for s in kept), topic
+    # the main claim of every item first, then the extra slot goes to the first item's detail
+    assert kept == ["Hippos cannot swim.", "Hippos have extremely dense and heavy bones.",
+                    "The Eiffel Tower grows taller in the summer.", "Honey never spoils.",
+                    "Wombats produce cube-shaped poop.", "Sharks are older than trees."]
+    assert [c.claim_id for c in cv.checkable] == [f"C{i}" for i in range(1, 7)]  # renumbered in order
+    assert len(cv.over_limit) == 4 and all("limit of 6" in d.reason for d in cv.over_limit)
+
+
+def test_claim_limit_in_one_paragraph_groups_by_sentence(config):
+    text = "Paris is in France. Rome is in Italy. Berlin is in Germany."
+    raw = ext(claim_dict("Paris is in France.", "Paris is in France."),
+              claim_dict("Paris is a city.", "Paris is in France."),
+              claim_dict("Rome is in Italy.", "Rome is in Italy."),
+              claim_dict("Berlin is in Germany.", "Berlin is in Germany."))
+    cv = validate_claims(raw, text, config.model_copy(update={"max_checkable_claims": 3}))
+    assert [c.statement for c in cv.checkable] == ["Paris is in France.", "Rome is in Italy.", "Berlin is in Germany."]
+
+
+def test_claim_ids_stay_contiguous_with_opinions_and_duplicates(config):
+    text = "Paris is the most beautiful city. Rome is in Italy. Rome is in Italy, a country. Berlin is in Germany."
+    raw = ext(claim_dict("Paris is the most beautiful city.", "Paris is the most beautiful city.", checkability="OPINION"),
+              claim_dict("Rome is in Italy.", "Rome is in Italy."),
+              claim_dict("Berlin is in Germany.", "Berlin is in Germany."))
+    cv = validate_claims(raw, text, config.model_copy(update={"max_checkable_claims": 1}))
+    ids = sorted(c.claim_id for c in cv.checkable + cv.not_checkable)
+    assert ids == ["C1", "C2"] and [c.statement for c in cv.checkable] == ["Rome is in Italy."]

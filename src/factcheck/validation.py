@@ -159,16 +159,6 @@ def validate_claims(extraction: LLMExtraction, text: str, config: Config,
             continue
 
         is_checkable = raw.checkability == Checkability.CHECKABLE
-        if is_checkable and len(result.checkable) >= config.max_checkable_claims:
-            result.over_limit.append(
-                DroppedClaim(
-                    statement=statement[:300],
-                    source_excerpt=excerpt[:300],
-                    reason=f"over the limit of {config.max_checkable_claims} checkable claims per run",
-                )
-            )
-            continue
-
         primary = _clean_queries(raw.primary_queries, config.max_queries_per_round) or [statement[:200]]
         fallback = [
             q for q in _clean_queries(raw.fallback_queries, config.max_queries_per_round)
@@ -189,7 +179,73 @@ def validate_claims(extraction: LLMExtraction, text: str, config: Config,
         next_id += 1
         accepted.append((statement, excerpt, claim.claim_id))
         (result.checkable if is_checkable else result.not_checkable).append(claim)
+    _apply_claim_limit(result, text, config.max_checkable_claims)
     return result
+
+
+def _input_items(text: str) -> list[str]:
+    """The input's items: its non-empty lines (a list, transcript segments), or, for a single
+    paragraph, its sentences."""
+    lines = [ln for ln in text.splitlines() if ln.strip()]
+    if len(lines) > 1:
+        return lines
+    return [s for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+
+
+def fair_claim_selection(claims: list[Claim], text: str, limit: int) -> list[Claim]:
+    """Choose up to ``limit`` claims so every part of the input gets a turn.
+
+    The extractor often splits one item into a main claim plus details ("Hippos cannot
+    swim." + "Their bones are dense."). Taking the first N claims would spend the whole
+    limit on the first items and never reach the last ones. Instead, claims are grouped by
+    the input item they were taken from and picked round-robin: the first claim of every
+    item, then the second of every item, and so on, in input order.
+    """
+    if len(claims) <= limit:
+        return list(claims)
+    items = _input_items(text)
+
+    def item_of(c: Claim) -> int:
+        return next((i for i, it in enumerate(items) if contains_normalized(it, c.source_excerpt)), len(items) + c.index)
+
+    groups: dict[int, list[Claim]] = {}
+    for c in claims:
+        groups.setdefault(item_of(c), []).append(c)
+    queues = [groups[k] for k in sorted(groups)]
+    chosen: list[Claim] = []
+    depth = 0
+    while len(chosen) < limit:
+        for q in queues:
+            if depth < len(q) and len(chosen) < limit:
+                chosen.append(q[depth])
+        depth += 1
+    keep = {c.claim_id for c in chosen}
+    return [c for c in claims if c.claim_id in keep]  # back in input order
+
+
+def _apply_claim_limit(result: ClaimValidation, text: str, limit: int) -> None:
+    """Cap the checkable claims fairly, then renumber the kept claims C1, C2, ... in input order."""
+    if len(result.checkable) > limit:
+        kept = fair_claim_selection(result.checkable, text, limit)
+        kept_ids = {c.claim_id for c in kept}
+        result.over_limit.extend(
+            DroppedClaim(statement=c.statement[:300], source_excerpt=c.source_excerpt[:300],
+                         reason=f"over the limit of {limit} checkable claims per run")
+            for c in result.checkable if c.claim_id not in kept_ids)
+        result.checkable = kept
+    survivors = sorted(result.checkable + result.not_checkable, key=lambda c: c.index)
+    renumber = {c.claim_id: f"C{i}" for i, c in enumerate(survivors, 1)}
+    if all(old == new for old, new in renumber.items()):
+        return
+    fix = lambda c: c.model_copy(update={"claim_id": renumber[c.claim_id], "index": int(renumber[c.claim_id][1:])})  # noqa: E731
+    result.checkable = [fix(c) for c in result.checkable]
+    result.not_checkable = [fix(c) for c in result.not_checkable]
+    for i, d in enumerate(result.dropped):
+        m = re.fullmatch(r"near-duplicate of (C\d+)", d.reason)
+        if m and m.group(1) not in renumber:
+            result.dropped[i] = d.model_copy(update={"reason": "near-duplicate of a claim over the per-run limit"})
+        elif m:
+            result.dropped[i] = d.model_copy(update={"reason": f"near-duplicate of {renumber[m.group(1)]}"})
 
 
 # --------------------------------------------------------------------------
@@ -204,11 +260,6 @@ _MAX = re.compile(r"\b(less than|under|at most|below|fewer than|up to)\s*$", re.
 
 def is_year_like(v: float) -> bool:
     return float(v).is_integer() and 1000 <= v <= 2100
-
-
-def claim_figures(statement: str) -> list[tuple[float, str]]:
-    """Numbers in a claim with a qualifier: exact | approx | min | max."""
-    return [(value, q) for value, q, _kind in classified_claim_figures(statement)]
 
 
 _MONTHS = (r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|"

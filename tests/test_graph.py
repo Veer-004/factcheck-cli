@@ -385,15 +385,30 @@ def test_over_limit_claims_disclosed(config):
 
 
 def test_search_credit_budget_is_never_exceeded(config):
-    cfg = config.model_copy(update={"search_credit_budget": 4, "max_concurrency": 1})
+    # 2 credits for 3 claims: shares 1, 1, 0, so the last claim cannot be searched at all.
+    cfg = config.model_copy(update={"search_credit_budget": 2, "max_concurrency": 1})
     text, corpus, pages, claims, rules = _topic_setup(3)
     search = FakeSearch(corpus, pages)
     report = run(text, FakeLLM(extraction(*claims), rule_judge(rules)), search, cfg)
     credits_spent = len(search.search_calls) + sum(-(-len(u) // 5) for u in search.extract_calls)
-    assert credits_spent <= 4 and report.stats.search_credits_used <= 4
+    assert credits_spent <= 2 and report.stats.search_credits_used <= 2
     failed = [r for r in report.claims if r.verdict == Verdict.PROCESSING_FAILED]
     assert failed and all("budget" in r.failure_reason for r in failed)
     assert any("budget" in w for w in report.warnings)
+
+
+@pytest.mark.parametrize("budget", [4, 6, 9])
+def test_tight_credit_budget_is_shared_fairly(config, budget):
+    """A claim that finishes first must not use up the credits of the claims after it."""
+    cfg = config.model_copy(update={"search_credit_budget": budget, "max_concurrency": 1})
+    text, corpus, pages, claims, rules = _topic_setup(3)
+    search = FakeSearch(corpus, pages)
+    report = run(text, FakeLLM(extraction(*claims), rule_judge(rules)), search, cfg)
+    assert report.stats.search_credits_used <= budget
+    searched = [r for r in report.claims if r.search_credits > 0]
+    assert len(searched) == 3, [(r.claim_id, r.verdict, r.failure_reason) for r in report.claims]
+    spent = sorted(r.search_credits for r in report.claims)
+    assert spent[-1] - spent[0] <= max(1, budget // 3)  # nobody gets far more than an equal share
 
 
 def test_llm_call_budget_marks_unfinished_claims(config):

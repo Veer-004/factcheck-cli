@@ -29,7 +29,7 @@ from .routes import router
 from .services import Backend
 
 log = logging.getLogger("factcheck_api")
-_UPLOAD_ROUTE = re.compile(r"^/api/v1/fact-check/(image|video|audio)/?$")
+_UPLOAD_ROUTE = re.compile(r"^/api/v1/(?:fact-check|plan)/(image|video|audio)/?$")
 MULTIPART_OVERHEAD = 1 * MB  # form boundaries and the small option fields
 
 DESCRIPTION = """
@@ -53,7 +53,8 @@ def create_app(settings: Optional[Settings] = None, backend: Optional[Backend] =
             log.warning(warning)
         app.state.limiters = {"text": anyio.CapacityLimiter(settings.text_concurrency),
                               "image": anyio.CapacityLimiter(settings.image_concurrency),
-                              "media": anyio.CapacityLimiter(settings.media_concurrency)}
+                              "media": anyio.CapacityLimiter(settings.media_concurrency),
+                              "plan": anyio.CapacityLimiter(2)}
         yield
 
     app = FastAPI(title="FactCheck API", version="1.0.0", description=DESCRIPTION, lifespan=lifespan)

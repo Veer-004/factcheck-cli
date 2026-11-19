@@ -58,16 +58,51 @@ class CallBudget:
 
 class CreditBudget:
     """Search-credit budget. Credits are reserved *before* a request is sent,
-    so the configured budget is never exceeded even under concurrency."""
+    so the configured budget is never exceeded even under concurrency.
+
+    Fair sharing: once the run knows its checkable claims, ``allot`` gives every
+    claim an equal guaranteed share (the remainder goes one credit each to the
+    first claims). A claim spends its own share first. It can draw on the shared
+    pool, which holds only the credits other claims released after their first
+    search round (``release``). A fast claim's second round therefore can never
+    use credits that a slower claim has not had the chance to spend. Before
+    ``allot`` (or for requests without a claim id) the budget is one shared pool.
+    """
 
     def __init__(self, limit: int):
         self.limit = limit
         self.used = 0
         self._lock = threading.Lock()
+        self._shares: dict[str, int] | None = None
+        self._pool = 0
 
-    def reserve(self, n: int) -> bool:
+    def allot(self, claim_ids: list[str]) -> dict[str, int]:
+        with self._lock:
+            free = self.limit - self.used
+            if not claim_ids:
+                self._shares = None
+                return {}
+            base, extra = divmod(free, len(claim_ids))
+            self._shares = {cid: base + (1 if i < extra else 0) for i, cid in enumerate(claim_ids)}
+            self._pool = 0
+            return dict(self._shares)
+
+    def release(self, claim_id: str) -> None:
+        """Hand the claim's unspent share to the shared pool (idempotent)."""
+        with self._lock:
+            if self._shares and self._shares.get(claim_id):
+                self._pool += self._shares[claim_id]
+                self._shares[claim_id] = 0
+
+    def reserve(self, n: int, claim_id: str | None = None) -> bool:
         with self._lock:
             if self.used + n > self.limit:
                 return False
+            if self._shares is not None and claim_id is not None:
+                own = min(self._shares.get(claim_id, 0), n)
+                if n - own > self._pool:
+                    return False
+                self._shares[claim_id] = self._shares.get(claim_id, 0) - own
+                self._pool -= n - own
             self.used += n
             return True

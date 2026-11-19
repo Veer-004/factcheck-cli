@@ -346,14 +346,6 @@
     background-position: -200% 0;
   }
 }
-@keyframes indeterminate {
-  from {
-    left: -35%;
-  }
-  to {
-    left: 100%;
-  }
-}
 @keyframes typing {
   0%,
   60%,
@@ -449,9 +441,6 @@
   color: transparent;
   animation: shimmer-text 3.2s linear infinite;
 }
-.animate-indeterminate {
-  animation: indeterminate 1.8s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-}
 .animate-typing {
   animation: typing 1.2s ease-in-out infinite;
 }
@@ -498,7 +487,6 @@
   .animate-blip,
   .animate-scan,
   .text-shimmer,
-  .animate-indeterminate,
   .animate-typing,
   .animate-eq,
   .animate-dotwave,

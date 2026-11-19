@@ -196,7 +196,7 @@ class RetrievalService:
                 self._sleep(wait)
                 attempt += 1
 
-    def run_round(self, queries: list[str]) -> RetrievalRound:
+    def run_round(self, queries: list[str], claim_id: str | None = None) -> RetrievalRound:
         rnd = RetrievalRound()
         for query in queries[: self.config.max_queries_per_round]:
             if not self._request_fits():
@@ -210,7 +210,7 @@ class RetrievalService:
                 rnd.searches_attempted += 1
                 rnd.searches_succeeded += 1
                 continue
-            if not self.budget.reserve(SEARCH_CREDITS):
+            if not self.budget.reserve(SEARCH_CREDITS, claim_id):
                 rnd.budget_exhausted = True
                 rnd.notes.append("search-credit budget reached; remaining queries skipped")
                 break
@@ -240,7 +240,7 @@ class RetrievalService:
             rnd.notes.append("not enough run time left for page extraction; snippets used at reduced weight")
         elif to_fetch:
             cost = extract_credits(len(to_fetch))
-            if not self.budget.reserve(cost):
+            if not self.budget.reserve(cost, claim_id):
                 rnd.budget_exhausted = True
                 rnd.notes.append("search-credit budget reached; using search snippets instead of full pages")
             else:

@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import re
 import threading
-import time
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -61,7 +60,6 @@ class OllamaClient:
         parts = urlsplit(base_url)
         if parts.scheme not in ("http", "https") or not parts.hostname:
             raise ValueError("Ollama base URL must be http(s)://host[:port]")
-        created = time.monotonic()
         self.model = model
         self.base_url = base_url.rstrip("/")
         self.host = parts.hostname
@@ -72,7 +70,6 @@ class OllamaClient:
         self.options = {"num_ctx": num_ctx, "num_predict": max_output_tokens}
         self._http = http_client or PhaseTimeoutClient()
         self._one_at_a_time = threading.Lock()
-        self.client_init_s = round(time.monotonic() - created, 3)
         self.last_timings: dict[str, Any] = {}
         self.current_trace: list[tuple[str, float]] = []
         self.thinking_returned = False

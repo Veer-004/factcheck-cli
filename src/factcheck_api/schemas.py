@@ -27,6 +27,8 @@ class TextRequest(BaseModel):
                       examples=["The Eiffel Tower was completed in 1889. Water boils at 50 degrees Celsius."])
     max_claims: Optional[int] = Field(None, ge=1, le=12, description="Checkable claims to verify (default 6).")
     search_budget: Optional[int] = Field(None, ge=0, le=40, description="Web-search credits for this run (default 40).")
+    auto_plan: bool = Field(False, description="Let the AI planning agent choose `max_claims` / `search_budget` "
+                                               "(only for values that are not given).")
 
 
 class Summary(BaseModel):
@@ -141,8 +143,43 @@ class FactCheckResponse(BaseModel):
     warnings: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list, description="How to read scores and confidences.")
     processing_seconds: float
+    run_plan: Optional["PlanResponse"] = Field(
+        None, description="The run plan the AI planning agent chose on the server (`auto_plan`); null otherwise.")
     report: dict[str, Any] = Field(description="The complete module report (same as the CLI's --json-out), "
                                                "with temporary file paths replaced by the file name.")
+
+
+class PlanRequest(BaseModel):
+    mode: InputType
+    text: Optional[str] = Field(None, max_length=20000, description="The text to check (text mode).")
+    duration_s: Optional[float] = Field(None, ge=0, le=86400,
+                                        description="Media length in seconds (audio/video), when known.")
+    use_ai: bool = Field(False, description="Text only: ask the AI planning agent (one Gemini request) instead of "
+                                            "the instant rule-based estimate. For files use "
+                                            "`POST /api/v1/plan/{image|video|audio}`.")
+
+
+class PlanResponse(BaseModel):
+    """Suggested run settings. Pass `max_claims` and `search_budget` to the fact-check endpoint."""
+
+    mode: InputType
+    max_claims: int = Field(ge=1, le=12)
+    search_budget: int = Field(ge=0, le=40)
+    estimated_claims: int = Field(description="Checkable claims the planner expects in the input.")
+    estimated_credits: int = Field(description="Tavily credits a typical run of this plan uses.")
+    basis: Literal["agent", "text", "duration", "typical", "default"] = Field(
+        description="What the estimate is based on: `agent` = the AI planner read the content.")
+    planner: Literal["agent", "rules"] = Field(
+        "rules", description="`agent`: the AI planning agent decided; `rules`: the rule-based fallback.")
+    model: Optional[str] = Field(None, description="The model the planning agent used.")
+    deferred: bool = Field(False, description="For files: the AI planner decides after reading the extracted "
+                                              "text on the server; these numbers are only a preview.")
+    statements: list[str] = Field(default_factory=list,
+                                  description="The checkable statements the agent found (text and media).")
+    credits_left: Optional[int] = Field(None, description="Tavily credits left this month; null if unknown.")
+    credits_limit: Optional[int] = Field(None, description="The Tavily plan's monthly credits; null if unknown.")
+    reasons: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
 
 
 class ModuleStatus(BaseModel):

@@ -54,20 +54,42 @@ src/
   lib/          config (env), types (mirror of FactCheckResponse), api (the only module that calls the
                 backend), verdict styles, formatting
   hooks/        useInvestigation (request state, lives in App), useRoute (#/ and #/investigate),
-                useHealth (GET /health), useObjectUrl (local previews)
+                useHealth (GET /health), useObjectUrl (local previews), useRunPlan (rule-based / AI / manual run settings)
   components/
     landing/    HeroSection, HowItWorks, LandingPage
-    workspace/  ModalitySelector, TextInput, FileUpload, VerifyButton, InvestigationLoader,
+    workspace/  ModalitySelector, TextInput, FileUpload, RunSettings, VerifyButton, InvestigationLoader,
                 ErrorState, BackendStatus, InvestigationWorkspace
     report/     InvestigationReport, ClaimCard, VerdictBadge, EvidenceScore, SourcesList,
                 MediaEvidence (OCR overlay, video/audio timeline, transcript)
     fx/         TextFx (scramble decode, mask rise, blur-in, rotating word, marker, count-up, typewriter,
-                strike & replace), LoaderFx (indeterminate bar, typing dots, equalizer, dot wave)
+                strike & replace), LoaderFx (typing dots, equalizer, dot wave, scan frame)
   lib/pdfReport.ts  the downloadable PDF report
     visual/     OceanBackground (canvas particles), Sonar, BrandMark
     layout/     Navbar, Footer
     ui/         Toast
 ```
+
+## Run settings: rule-based, AI or manual
+
+The **Run settings** panel above the Verify button sizes the run (claims to check and Tavily search
+credits) for every input type: text, image, audio and video. Its switch has three positions:
+
+- **Rule-based** (the default): an instant estimate, refreshed whenever the input changes, with no model
+  call. A new input always comes back here, unless you chose Manual.
+- **AI**: nothing happens until you click **Calculate with AI**.
+  - Text: the AI planning agent reads the text, usually in a few seconds.
+  - Image, audio or video: the file is uploaded and read on the server first (OCR or transcription), then
+    the agent decides. This takes about as long as the extraction step.
+  - The panel shows the elapsed time, the agent's reason, and the checkable statements it found under "Why
+    these numbers?".
+  - Until it has been calculated, the rule-based numbers are shown and used.
+- **Manual**: your own numbers. It starts from the numbers on screen, and changing a value in any mode
+  switches here.
+
+The panel also shows any warning (for example, that the AI planner was unavailable and the rule-based
+estimate was used). It doesn't display the remaining Tavily credits, but every plan still stays within them. The plan used for a run appears in the report header
+("Run plan") and in the PDF details. The rules are described in the root README under "Run planning" and
+"Fair use of the limits".
 
 ## What the report shows (all from the API response)
 

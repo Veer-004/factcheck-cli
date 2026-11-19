@@ -6,7 +6,7 @@
 // measured.
 
 import { API_BASE_URL, REQUEST_TIMEOUT_MS, type MediaMode, type Mode } from "./config";
-import type { ApiErrorBody, FactCheckResponse, HealthResponse } from "./types";
+import type { ApiErrorBody, FactCheckResponse, HealthResponse, RunOptions, RunPlan } from "./types";
 
 export type ApiErrorKind = "http" | "network" | "timeout" | "aborted" | "invalid_response";
 
@@ -118,20 +118,63 @@ export async function getHealth(signal?: AbortSignal): Promise<HealthResponse> {
   }
 }
 
-export function verifyText(text: string, signal?: AbortSignal, onEvent?: (e: TransferEvent) => void) {
-  return post("/api/v1/fact-check/text", JSON.stringify({ text }), { "Content-Type": "application/json" },
+async function planRequest(path: string, init: RequestInit, signal?: AbortSignal): Promise<RunPlan> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE_URL}${path}`, { method: "POST", ...init, signal });
+  } catch (e) {
+    if ((e as Error).name === "AbortError") throw new ApiError("aborted", "Planning was cancelled.");
+    throw networkError();
+  }
+  if (!res.ok) {
+    let body: unknown = null;
+    try {
+      body = await res.json();
+    } catch {
+      body = null;
+    }
+    if (isErrorBody(body)) throw new ApiError("http", body.error.message, res.status, body.error.code);
+    throw new ApiError("http", `The planner answered with HTTP ${res.status}.`, res.status);
+  }
+  return (await res.json()) as RunPlan;
+}
+
+/** Run plan for the input. Rule-based and instant by default; `useAi` (text) asks the AI planning agent. */
+export function getPlan(req: { mode: Mode; text?: string; duration_s?: number | null; useAi?: boolean },
+                        signal?: AbortSignal): Promise<RunPlan> {
+  return planRequest("/api/v1/plan", {
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode: req.mode, text: req.text, duration_s: req.duration_s ?? undefined, use_ai: !!req.useAi }),
+  }, signal);
+}
+
+/** AI run plan for a file: the server reads it (OCR / transcription, no fact-check) and the agent decides. */
+export function getFilePlan(mode: MediaMode, file: File, signal?: AbortSignal): Promise<RunPlan> {
+  const form = new FormData();
+  form.append("file", file, file.name);
+  return planRequest(`/api/v1/plan/${mode}`, { body: form }, signal);
+}
+
+function verifyText(text: string, options: RunOptions | undefined, signal?: AbortSignal,
+                    onEvent?: (e: TransferEvent) => void) {
+  return post("/api/v1/fact-check/text", JSON.stringify({ text, ...options }), { "Content-Type": "application/json" },
               REQUEST_TIMEOUT_MS.text, signal, onEvent);
 }
 
-export function verifyFile(mode: MediaMode, file: File, signal?: AbortSignal, onEvent?: (e: TransferEvent) => void) {
+function verifyFile(mode: MediaMode, file: File, options: RunOptions | undefined, signal?: AbortSignal,
+                    onEvent?: (e: TransferEvent) => void) {
   const form = new FormData();
   form.append("file", file, file.name);
+  if (options?.max_claims != null) form.append("max_claims", String(options.max_claims));
+  if (options?.search_budget != null) form.append("search_budget", String(options.search_budget));
+  if (options?.auto_plan) form.append("auto_plan", "true");
   return post(`/api/v1/fact-check/${mode}`, form, {}, REQUEST_TIMEOUT_MS[mode], signal, onEvent);
 }
 
-export function verify(mode: Mode, input: { text: string; file: File | null }, signal?: AbortSignal,
-                       onEvent?: (e: TransferEvent) => void): Promise<FactCheckResponse> {
-  if (mode === "text") return verifyText(input.text, signal, onEvent);
+/** Without `options` the server uses its defaults (6 claims, 40 credits). */
+export function verify(mode: Mode, input: { text: string; file: File | null }, options?: RunOptions,
+                       signal?: AbortSignal, onEvent?: (e: TransferEvent) => void): Promise<FactCheckResponse> {
+  if (mode === "text") return verifyText(input.text, options, signal, onEvent);
   if (!input.file) return Promise.reject(new ApiError("http", "Choose a file first.", 400, "missing_file"));
-  return verifyFile(mode, input.file, signal, onEvent);
+  return verifyFile(mode, input.file, options, signal, onEvent);
 }

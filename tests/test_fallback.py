@@ -249,7 +249,7 @@ def test_config_defaults_and_env(monkeypatch):
         (False, "qwen3:8b", "http://127.0.0.1:11500", 45.0)
 
 
-@pytest.mark.parametrize("env,value", [("FACTCHECK_PROVIDER", "nvidia"), ("FACTCHECK_PROVIDER", "openai"),
+@pytest.mark.parametrize("env,value", [("FACTCHECK_PROVIDER", "openai"),
                                        ("FACTCHECK_OLLAMA_URL", "ftp://x"), ("FACTCHECK_OLLAMA_MODEL", "../x"),
                                        ("FACTCHECK_OLLAMA_TIMEOUT", "0")])
 def test_invalid_provider_settings_rejected(monkeypatch, env, value):
@@ -297,19 +297,13 @@ def test_11_cli_text_verbose_json_and_exit_codes_with_fallback(monkeypatch, tmp_
     assert "fallback ollama:qwen3:4b served 2 call(s)" in capsys.readouterr().out
 
 
-def test_cli_help_and_check_config_mention_no_nvidia(capsys):
+def test_cli_help_and_check_config(capsys):
     with pytest.raises(SystemExit) as exc:
         cli.main(["--help"])
     assert exc.value.code == 0
     assert cli.main(["--check-config"]) == 0
     out = capsys.readouterr().out
-    assert "ollama_model: qwen3:4b" in out and "nvidia" not in out.lower()
-
-
-def test_nvidia_diagnostic_is_gone():
-    with pytest.raises(SystemExit) as exc:
-        diagnostics.main(["nvidia"])
-    assert exc.value.code == 2
+    assert "ollama_model: qwen3:4b" in out
 
 
 def test_ollama_diagnostic_unreachable_server_is_reported():

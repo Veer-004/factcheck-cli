@@ -1102,6 +1102,66 @@ API-only settings (all optional; see `.env.example`):
 | POST | `/api/v1/fact-check/image` | multipart `file` (+ optional `max_claims`, `search_budget`) | `verify_image` (as `factcheck-ocr --fact-check`) |
 | POST | `/api/v1/fact-check/video` | multipart `file` (+ options) | `verify_video` (as `factcheck-video`) |
 | POST | `/api/v1/fact-check/audio` | multipart `file` (+ options) | `verify_audio` (as `factcheck-audio`) |
+| POST | `/api/v1/plan` | JSON `{"mode": "text", "text": "...", "use_ai": false}` or `{"mode": "video", "duration_s": 60}` | run plan: rule-based, or the AI agent for text (below) |
+| POST | `/api/v1/plan/image`, `/video`, `/audio` | multipart `file` | AI run plan for a file: reads it (no fact-check), then the agent decides |
+
+### Run planning: rule-based, AI or manual (`/api/v1/plan`)
+
+Two numbers size every run: `max_claims` and `search_budget`. They can come from three places, and the
+frontend shows a **Rule-based / AI / Manual** switch for every input type.
+
+**Rule-based (the default, instant, free):** `POST /api/v1/plan` with
+`{"mode": ..., "text": ..., "duration_s": ...}`.
+- Text: every declarative sentence counts as a claim. Questions, opinions without a figure, greetings and
+  sign-offs don't count, and two clauses joined by and/but/while count twice. List markers such as "1."
+  are ignored.
+- Audio / video: about one claim per 30 s of media, plus one for on-screen text in a video.
+- Image: 3.
+- `max_claims` = estimate + 1, within 1-12. `search_budget` = 4 credits per claim + 2, within 0-40.
+
+**AI, only on request ("Calculate with AI"):** the AI planning agent (`PlanningAgent` in
+`src/factcheck_api/planner.py`) makes one Gemini request. It reads the content and lists every distinct
+checkable statement, including supporting details (the claim extractor checks those as claims of their
+own). It judges how many are hard to verify and chooses the two numbers with a one-line reason.
+- Text: `POST /api/v1/plan` with `"use_ai": true`.
+- Files: `POST /api/v1/plan/image`, `/video` or `/audio` (multipart `file`). The server first reads the
+  file the way the fact-check would: OCR for images, speech and on-screen text for video, transcription
+  for audio. This runs without a fact-check, so it uses no search credits. Then the agent decides. For
+  video and audio this takes about as long as the extraction step of a fact-check, and the fact-check
+  repeats that extraction.
+- Decisions are cached by content for 10 minutes. The prompt marks the content as untrusted data.
+- If the agent can't answer, the rule-based estimate of the same content is returned, with a warning in
+  `warnings`. That covers quota/429, timeout, no key and malformed output; a transient 5xx is retried once.
+- Images, audio and video without readable text or speech need no model call.
+
+**Manual:** the client sends its own `max_claims` / `search_budget`.
+
+Guardrails apply to every plan:
+- `max_claims` stays within 1-12;
+- the AI budget stays between 3 and 6 credits per planned claim, and within 0-40;
+- no plan asks for more than the Tavily credits left this month. These are read from Tavily's free
+  `GET /usage`, cached for 60 s and re-read after every run, and Tavily's count can lag a few minutes. When
+  credits are short, fewer claims are planned so each one still gets a full search.
+
+The fact-check endpoints still accept `auto_plan=true` (the agent plans on the server, after extraction).
+Without any of these fields they keep their defaults (6 and 40).
+
+### Fair use of the limits
+
+Every part of the input gets a fair chance, even when the limits are tight:
+
+- **Claim limit:** when the extractor finds more checkable claims than `max_claims`, they are picked
+  **round-robin by input item** (`factcheck.validation.fair_claim_selection`). An item is a line, or a
+  sentence for a single paragraph. The first claim of every item comes first, then the second of every
+  item, and so on. Before, the first N claims were taken in order. A list of facts split into main + detail
+  claims could then use the whole limit on the first items: with 5 facts and 6 slots, facts 4 and 5 were
+  never checked.
+- **Search credits:** once the checked claims are known, each one gets an **equal guaranteed share** of
+  the budget (`factcheck.limits.CreditBudget.allot`). A claim spends its own share first. It can draw on a
+  shared pool, which holds only the credits other claims released after their first search round. A claim
+  that finishes early therefore can't spend a second search round using credits a slower claim hasn't had
+  the chance to use. Before, 15 credits for 6 claims could run out after four claims, leaving two "Not
+  processed".
 
 Supported uploads:
 

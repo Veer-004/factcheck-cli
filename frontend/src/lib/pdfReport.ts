@@ -2,6 +2,7 @@
 // Deep Ocean look as the site: dark pages, glass cards, teal accents, the sonar mark and the same
 // verdict colours (src/lib/palette.ts). jsPDF is loaded only when the user downloads a report.
 
+import { describePlan } from "./runPlan";
 import type { jsPDF as JsPDF } from "jspdf";
 import { domainOf, fmtDate, fmtTime, safeHref, titleCase } from "./format";
 import { hexToRgb, PALETTE } from "./palette";
@@ -303,6 +304,7 @@ function cover(w: Writer, r: FactCheckResponse) {
     ...(r.filename ? [["File", r.filename] as [string, string]] : []),
     ["Generated", new Date().toLocaleString()],
     ...(model ? [["AI model", model] as [string, string]] : []),
+    ...(r.run_plan ? [["Run plan", describePlan(r.run_plan)] as [string, string]] : []),
     ...(s.over_limit_claims ? [["Not verified", `${s.over_limit_claims} claim(s) over the per-run limit`] as [string, string]] : []),
     ...(s.dropped_claims ? [["Removed", `${s.dropped_claims} claim(s) removed by validation`] as [string, string]] : []),
   ];

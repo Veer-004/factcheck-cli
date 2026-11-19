@@ -2,17 +2,8 @@
 
 import type { Mode } from "../../lib/config";
 
-/** Indeterminate Bar: a light sweeping along a track, for "working, no ETA". */
-export function IndeterminateBar({ className = "" }: { className?: string }) {
-  return (
-    <div className={`relative h-[3px] w-full overflow-hidden rounded-full bg-[rgba(140,166,176,0.14)] ${className}`} aria-hidden>
-      <span className="animate-indeterminate absolute inset-y-0 w-1/3 rounded-full bg-[linear-gradient(90deg,transparent,var(--color-teal),transparent)]" />
-    </div>
-  );
-}
-
 /** Typing Dots. */
-export function TypingDots({ className = "" }: { className?: string }) {
+function TypingDots({ className = "" }: { className?: string }) {
   return (
     <span className={`inline-flex items-center gap-1 ${className}`} aria-hidden>
       {[0, 1, 2].map((i) => (

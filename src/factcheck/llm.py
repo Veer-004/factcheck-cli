@@ -408,7 +408,6 @@ class GeminiClient:
 
         if not api_key:
             raise LLMAuthError("GEMINI_API_KEY is not set")
-        created = time.monotonic()
         self._types = types
         self._http = PhaseTimeoutClient()
         # SDK-level retries are disabled so that our bounded policy is the only one.
@@ -421,7 +420,6 @@ class GeminiClient:
                 httpx_client=self._http,
             ),
         )
-        self.client_init_s = round(time.monotonic() - created, 3)
         self.temperature = temperature
         self.thinking_level = thinking_level
         self.last_timings: dict[str, Any] = {}

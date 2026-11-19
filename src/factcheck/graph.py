@@ -16,6 +16,8 @@ never overwrite one another; results are re-sorted by claim index afterwards.
 
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import operator
 import os
 import time
@@ -157,7 +159,9 @@ def build_claim_graph(deps: Deps):
             queries = claim.primary_queries
         else:
             queries = _fallback_queries(claim, set(claim.primary_queries))
-        rnd = deps.retrieval.run_round(queries)
+        rnd = deps.retrieval.run_round(queries, claim.claim_id)
+        if rounds_done == 0:  # first round done: unspent guaranteed credits go to the shared pool
+            deps.retrieval.budget.release(claim.claim_id)
         pages = dict(state.get("pages", {}))
         pages.update(rnd.pages)
         return {
@@ -248,6 +252,7 @@ def build_claim_graph(deps: Deps):
         }
 
     def finalize(state: ClaimState) -> dict[str, Any]:
+        deps.retrieval.budget.release(state["claim"].claim_id)  # e.g. stopped before searching
         return {"result": finalize_claim(state, cfg)}
 
     def route_gate(state: ClaimState) -> str:
@@ -412,6 +417,8 @@ def build_graph(deps: Deps):
                     withheld.append(_base_result(claim, Verdict.PROCESSING_FAILED, failure_reason=reason))
                 else:
                     checkable.append(claim)
+        # Every claim that will be searched gets an equal guaranteed share of the search credits.
+        deps.retrieval.budget.allot([c.claim_id for c in checkable])
         return {
             "checkable": checkable,
             "results": withheld,
@@ -546,6 +553,24 @@ def verify_text(
     return run_pipeline(text, config, llm, search)
 
 
+# Optional run planner (set by the API's AI planning agent via ``use_run_planner``). It receives the text
+# about to be fact-checked (for images, audio and video: the OCR/transcript text) and the configuration,
+# and returns Config overrides such as ``max_checkable_claims`` / ``search_credit_budget``. It runs before
+# the run deadline starts. A context variable keeps it per call and lets the modules' signatures stay as they are.
+RunPlanner = Callable[[str, Config], dict[str, Any]]
+_RUN_PLANNER: contextvars.ContextVar[Optional[RunPlanner]] = contextvars.ContextVar("factcheck_run_planner",
+                                                                                     default=None)
+
+
+@contextlib.contextmanager
+def use_run_planner(planner: Optional[RunPlanner]):
+    token = _RUN_PLANNER.set(planner)
+    try:
+        yield
+    finally:
+        _RUN_PLANNER.reset(token)
+
+
 def run_pipeline(
     text: str,
     config: Config | None = None,
@@ -560,6 +585,11 @@ def run_pipeline(
     ``factcheck_video.pipeline.verify_video``."""
     config = config or Config.from_env()
     text = validate_input(text, config)
+    planner = _RUN_PLANNER.get()
+    if planner is not None:
+        overrides = {k: v for k, v in planner(text, config).items() if v is not None}
+        if overrides:
+            config = config.model_copy(update=overrides)
     deadline = Deadline(config.run_timeout_s)
     call_budget = CallBudget(config.max_llm_calls)
     model_label = None

@@ -254,3 +254,20 @@ def test_retrieval_service_cache_avoids_repeat_spend(config):
     used = budget.used
     svc.run_round(["Same  Query"])
     assert Counting.n == 1 and budget.used == used + 1  # only the (uncached) extract is re-attempted
+
+
+def test_credit_budget_fair_shares_and_pool():
+    b = CreditBudget(15)
+    assert b.allot(["C1", "C2", "C3", "C4", "C5", "C6"]) == {"C1": 3, "C2": 3, "C3": 3, "C4": 2, "C5": 2, "C6": 2}
+    assert b.reserve(3, "C1")
+    assert not b.reserve(1, "C1")  # its share is spent and the pool is empty
+    b.release("C2")  # C2 finished its first round having spent nothing
+    assert b.reserve(3, "C1")  # C1's second round draws on C2's released credits
+    assert not b.reserve(1, "C1")
+    for cid in ("C3", "C4", "C5", "C6"):  # everyone else still has their full share
+        assert b.reserve(2, cid)
+    assert b.reserve(1, "C3") and not b.reserve(1, "C4")
+    assert b.used == 15
+    b.release("C2")  # idempotent
+    shared = CreditBudget(5)  # never allotted: one shared pool, as before
+    assert shared.reserve(5) and not shared.reserve(1)

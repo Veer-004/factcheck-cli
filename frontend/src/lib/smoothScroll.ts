@@ -40,10 +40,3 @@ export function scrollToTarget(id: string | null, immediate = false) {
   if (el) el.scrollIntoView({ behavior: immediate ? "auto" : "smooth", block: "start" });
   else window.scrollTo({ top: 0 });
 }
-
-/** Pause/resume page scrolling (e.g. while a modal is open). */
-export function setScrollLocked(locked: boolean) {
-  if (!lenis) return;
-  if (locked) lenis.stop();
-  else lenis.start();
-}

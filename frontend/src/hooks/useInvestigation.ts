@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { ApiError, verify, type TransferEvent } from "../lib/api";
 import type { Mode } from "../lib/config";
-import type { FactCheckResponse } from "../lib/types";
+import type { FactCheckResponse, RunOptions, RunPlan } from "../lib/types";
 
 export interface Inputs {
   text: string;
@@ -33,7 +33,7 @@ export function useInvestigation() {
   const controller = useRef<AbortController | null>(null);
   const running = useRef(false);
 
-  const start = useCallback(async (mode: Mode, inputs: Inputs) => {
+  const start = useCallback(async (mode: Mode, inputs: Inputs, options?: RunOptions, plan?: RunPlan | null) => {
     if (running.current) return; // duplicate submissions are ignored
     running.current = true;
     const file = mode === "text" ? null : inputs.files[mode];
@@ -50,7 +50,9 @@ export function useInvestigation() {
       publish();
     };
     try {
-      const result = await verify(mode, { text: inputs.text, file }, controller.current.signal, onEvent);
+      const raw = await verify(mode, { text: inputs.text, file }, options, controller.current.signal, onEvent);
+      // The server reports the plan only when its AI agent chose it; otherwise keep the one the page used.
+      const result = { ...raw, run_plan: raw.run_plan ?? plan ?? null };
       transfer = { ...transfer, sentAt: transfer.sentAt ?? Date.now(), receivedAt: Date.now() };
       publish(); // last checkpoint reached: the liquid fills to the top
       await new Promise((r) => setTimeout(r, FINISH_MS));

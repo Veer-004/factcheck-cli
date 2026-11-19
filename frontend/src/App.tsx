@@ -80,7 +80,7 @@ export default function App() {
               inputs={inputs}
               setInputs={setInputs}
               investigation={state}
-              onVerify={() => void start(state.phase === "error" ? state.mode : mode, inputs)}
+              onVerify={(options, plan) => void start(state.phase === "error" ? state.mode : mode, inputs, options, plan)}
               onStopWaiting={stopWaiting}
               onReset={reset}
               health={health}

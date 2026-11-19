@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from "framer-motion";
-import { AlertTriangle, FileDown, FileSearch, PencilLine, Plus } from "lucide-react";
+import { BrainCircuit, AlertTriangle, FileDown, FileSearch, PencilLine, Plus } from "lucide-react";
+import { describePlan } from "../../lib/runPlan";
 import { useToast } from "../ui/Toast";
 import { useCallback, useRef, useState } from "react";
 import { useObjectUrl } from "../../hooks/useObjectUrl";
@@ -114,6 +115,16 @@ export function InvestigationReport({ result, file, onNew, onEdit }: Props) {
           </div>
         </div>
         <div className="mt-7"><Distribution result={result} /></div>
+        {result.run_plan && (
+          <p className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted">
+            <BrainCircuit className="h-3.5 w-3.5 text-teal" />
+            <span className="eyebrow !text-micro">Run plan</span>
+            <span className="text-ice/90">{describePlan(result.run_plan)}</span>
+            {result.run_plan.reasons[0] && result.run_plan.planner === "agent" && (
+              <span className="basis-full text-muted sm:basis-auto">— {result.run_plan.reasons[0]}</span>
+            )}
+          </p>
+        )}
         <div className="mt-7 flex flex-wrap gap-2.5">
           <button onClick={onNew} className="btn btn-primary"><Plus className="h-4 w-4" /> New investigation</button>
           <button onClick={onEdit} className="btn btn-glass"><PencilLine className="h-4 w-4" /> Edit input</button>

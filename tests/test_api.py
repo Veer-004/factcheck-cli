@@ -45,7 +45,7 @@ SPOKEN = "The Eiffel Tower was completed in 1889."
 WRONG = "The Eiffel Tower was completed in 1899."
 Q = ["Eiffel Tower completed 1889"]
 TOP_KEYS = {"status", "input_type", "filename", "summary", "claims", "dropped_claims", "over_limit_claims",
-            "not_checked_reason", "warnings", "notes", "processing_seconds", "report"}
+            "not_checked_reason", "warnings", "notes", "processing_seconds", "run_plan", "report"}
 CLAIM_KEYS = {"claim_id", "claim", "source_excerpt", "verdict", "evidence_score", "explanation", "citations",
               "citation_validation", "timestamps", "provenance", "correction", "failure_reason"}
 ERROR_KEYS = {"status", "error", "request_id"}
@@ -129,7 +129,8 @@ def test_openapi_documents_every_endpoint(settings):
         spec = c.get("/openapi.json").json()
         assert c.get("/docs").status_code == 200
     assert set(spec["paths"]) == {"/health", "/api/v1/fact-check/text", "/api/v1/fact-check/image",
-                                  "/api/v1/fact-check/video", "/api/v1/fact-check/audio"}
+                                  "/api/v1/fact-check/video", "/api/v1/fact-check/audio", "/api/v1/plan",
+                                  "/api/v1/plan/image", "/api/v1/plan/video", "/api/v1/plan/audio"}
     for path in ("text", "image", "video", "audio"):
         op = spec["paths"][f"/api/v1/fact-check/{path}"]["post"]
         assert op["description"] and op["summary"]
@@ -191,6 +192,22 @@ def test_text_options_reach_the_engine(settings):
     with client_for(settings, llm=llm, search=FakeSearch(CORPUS, PAGES), make_config=factory) as c:
         r = c.post("/api/v1/fact-check/text", json={"text": SPOKEN, "max_claims": 2, "search_budget": 5})
     assert r.status_code == 200 and seen["max_checkable_claims"] == 2 and seen["search_credit_budget"] == 5
+
+
+def test_a_run_refreshes_the_planner_credit_count(settings):
+    class Credits:
+        invalidated = 0
+
+        def __call__(self):
+            return None
+
+        def invalidate(self):
+            Credits.invalidated += 1
+
+    llm = FakeLLM(extraction(claim_dict(SPOKEN, queries=Q)), year_judge)
+    with client_for(settings, llm=llm, search=FakeSearch(CORPUS, PAGES), credits=Credits()) as c:
+        assert c.post("/api/v1/fact-check/text", json={"text": SPOKEN}).status_code == 200
+    assert Credits.invalidated == 1
 
 
 @pytest.mark.parametrize("payload,status,code", [
@@ -522,3 +539,60 @@ def test_no_persistent_infrastructure_is_used():
             "print(sorted(m for m in ('sqlite3', 'redis', 'celery', 'sqlalchemy', 'pymongo', 'psycopg2')"
             " if m in sys.modules))")
     assert subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True).stdout.strip() == "[]"
+
+
+# ------------------------------------------------------------------ "Calculate with AI" for files
+
+
+class RecordingPlanner:
+    """Stands in for the AI planning agent: records the content it was given."""
+
+    def __init__(self):
+        self.seen = []
+
+    def __call__(self, mode, text, duration_s=None, credits=None):
+        from factcheck_api.planner import rule_plan
+
+        self.seen.append((mode, text, duration_s))
+        return rule_plan("text", text=text, credits=credits).model_copy(update={"mode": mode, "planner": "agent"})
+
+
+def test_ai_plan_for_an_image_reads_it_with_ocr_first(settings, uploads):
+    agent = RecordingPlanner()
+    engine = ColorEngine({RED: [(SPOKEN, 0.97)]})
+    with client_for(settings, make_ocr_engine=lambda: engine, planner=agent, credits=lambda: None) as c:
+        r = c.post("/api/v1/plan/image", files={"file": ("meme.png", png_bytes(), "image/png")})
+    assert r.status_code == 200, r.text
+    assert r.json()["planner"] == "agent" and r.json()["mode"] == "image"
+    assert agent.seen == [("image", SPOKEN, None)] and no_temp_files(uploads)
+
+
+def test_ai_plan_for_audio_and_video_reads_the_transcript(settings, uploads, audio_bytes, video_bytes):
+    agent = RecordingPlanner()
+    audio_tr = FakeAudioTranscriber([seg(1, 0.0, 3.5, SPOKEN)])
+    video_tr = FakeTranscriber([seg(1, 0.2, 3.0, SPOKEN)])
+    with client_for(settings, planner=agent, credits=lambda: None, make_audio_transcriber=lambda: audio_tr,
+                    make_video_transcriber=lambda: video_tr, make_ocr_engine=lambda: ColorEngine({})) as c:
+        a = c.post("/api/v1/plan/audio", files={"file": ("talk.mp3", audio_bytes, "audio/mpeg")})
+        v = c.post("/api/v1/plan/video", files={"file": ("talk.mp4", video_bytes, "video/mp4")})
+    assert a.status_code == 200 and v.status_code == 200, (a.text, v.text)
+    (am, at, ad), (vm, vt, vd) = agent.seen
+    assert (am, vm) == ("audio", "video") and SPOKEN in at and SPOKEN in vt
+    assert ad and vd and 3.5 < ad < 4.5 and 3.5 < vd < 4.5  # media length is passed on
+    assert no_temp_files(uploads)
+
+
+def test_ai_plan_for_a_file_without_text_needs_no_model_call(settings, uploads):
+    agent = RecordingPlanner()
+    with client_for(settings, make_ocr_engine=lambda: ColorEngine({}), planner=agent, credits=lambda: None) as c:
+        r = c.post("/api/v1/plan/image", files={"file": ("blank.png", png_bytes(), "image/png")})
+    assert r.status_code == 200 and agent.seen == []
+    assert "nothing to check" in r.json()["reasons"][0]
+
+
+def test_ai_plan_upload_errors(settings, uploads):
+    with client_for(settings, planner=RecordingPlanner(), credits=lambda: None) as c:
+        assert_error(c.post("/api/v1/plan/image", files={"file": ("x.exe", b"MZ", "application/octet-stream")}),
+                     415, "unsupported_media_type")
+        assert_error(c.post("/api/v1/plan/audio"), 422, "validation_error")
+    assert no_temp_files(uploads)

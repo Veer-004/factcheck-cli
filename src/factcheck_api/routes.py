@@ -14,9 +14,9 @@ from fastapi import APIRouter, File, Form, Request, UploadFile
 
 from factcheck.config import credential_status
 
-from . import responses, services
+from . import planner, responses, services
 from .errors import ErrorResponse
-from .schemas import FactCheckResponse, HealthResponse, ModuleStatus, TextRequest
+from .schemas import FactCheckResponse, HealthResponse, ModuleStatus, PlanRequest, PlanResponse, TextRequest
 from .uploads import EXTENSIONS, stored_upload
 
 router = APIRouter()
@@ -55,13 +55,82 @@ async def health() -> HealthResponse:
     return HealthResponse(version=ver, modules=modules, fact_check_configured=bool(configured))
 
 
+def _formats(kind: str) -> str:
+    return ", ".join(sorted(EXTENSIONS[kind]))
+
+
 async def _offload(request: Request, group: str, fn: Callable, *args):
     """Run a synchronous module call in a worker thread, bounded by the group's limiter.
 
     The await is not cancelled while the thread runs (anyio's default), so the temporary upload is never
     deleted under a running job, even when the client disconnects.
     """
-    return await anyio.to_thread.run_sync(functools.partial(fn, *args), limiter=request.app.state.limiters[group])
+    try:
+        return await anyio.to_thread.run_sync(functools.partial(fn, *args), limiter=request.app.state.limiters[group])
+    finally:
+        invalidate = getattr(request.app.state.backend.credits, "invalidate", None)
+        if invalidate:  # the run may have spent search credits: the next plan re-reads them
+            invalidate()
+
+
+@router.post("/api/v1/plan", response_model=PlanResponse, tags=["planning"],
+             summary="Suggest max_claims and search_budget for a run", responses=_errors(422))
+async def plan_run(request: Request, body: PlanRequest) -> PlanResponse:
+    """Suggest `max_claims` and `search_budget`.
+
+    By default this is the instant rule-based estimate (no model call, no search credits): it is computed from
+    the text, or from the media length for audio/video. With `use_ai` (text only) the AI planning agent reads
+    the text (one Gemini request) and decides. Either way the plan never exceeds the Tavily credits left this
+    month (read from Tavily's free usage endpoint when the key is set)."""
+    backend = request.app.state.backend
+    credits = await anyio.to_thread.run_sync(backend.credits)
+    if body.use_ai and body.mode == "text" and (body.text or "").strip():
+        return await anyio.to_thread.run_sync(
+            functools.partial(backend.planner, "text", body.text, credits=credits),
+            limiter=request.app.state.limiters["plan"])
+    return planner.rule_plan(body.mode, text=body.text, duration_s=body.duration_s, credits=credits)
+
+
+async def _plan_file(request: Request, kind: str, group: str, file: UploadFile) -> PlanResponse:
+    backend = request.app.state.backend
+    async with stored_upload(file, kind, request.app.state.settings) as up:
+        replacements = {str(up.path): up.display_name, str(up.directory): "", up.path.name: up.display_name}
+        text, duration = await anyio.to_thread.run_sync(
+            functools.partial(services.extract_for_plan, backend, kind, up.path, replacements),
+            limiter=request.app.state.limiters[group])
+    credits = await anyio.to_thread.run_sync(backend.credits)
+    if not text.strip():
+        plan = planner.rule_plan(kind, text="", credits=credits)
+        plan.reasons.insert(0, "No readable text or speech was found in the file, so there is nothing to check.")
+        return plan
+    return await anyio.to_thread.run_sync(
+        functools.partial(backend.planner, kind, text, duration_s=duration, credits=credits),
+        limiter=request.app.state.limiters["plan"])
+
+
+@router.post("/api/v1/plan/image", response_model=PlanResponse, tags=["planning"],
+             summary="AI run plan for an image", responses=_errors(400, 413, 415, 422, 500, 503))
+async def plan_image(request: Request,
+                     file: UploadFile = File(..., description=f"Image ({_formats('image')}).")) -> PlanResponse:
+    """Read the image's text with OCR (no fact-check), then let the AI planning agent size the run."""
+    return await _plan_file(request, "image", "image", file)
+
+
+@router.post("/api/v1/plan/video", response_model=PlanResponse, tags=["planning"],
+             summary="AI run plan for a video", responses=_errors(400, 413, 415, 422, 500, 503))
+async def plan_video(request: Request,
+                     file: UploadFile = File(..., description=f"Video ({_formats('video')}).")) -> PlanResponse:
+    """Extract the speech and on-screen text (no fact-check), then let the AI planning agent size the run.
+    Takes about as long as the extraction step of a fact-check."""
+    return await _plan_file(request, "video", "media", file)
+
+
+@router.post("/api/v1/plan/audio", response_model=PlanResponse, tags=["planning"],
+             summary="AI run plan for an audio file", responses=_errors(400, 413, 415, 422, 500, 503))
+async def plan_audio(request: Request,
+                     file: UploadFile = File(..., description=f"Audio ({_formats('audio')}).")) -> PlanResponse:
+    """Transcribe the speech (no fact-check), then let the AI planning agent size the run."""
+    return await _plan_file(request, "audio", "media", file)
 
 
 @router.post("/api/v1/fact-check/text", response_model=FactCheckResponse, tags=["fact-check"],
@@ -76,28 +145,31 @@ async def fact_check_text(request: Request, body: TextRequest) -> FactCheckRespo
 
         raise APIError(413, "text_too_large", f"The text exceeds {settings.max_text_chars} characters.")
     started = time.perf_counter()
-    opts = services.Options(body.max_claims, body.search_budget)
+    opts = services.Options(body.max_claims, body.search_budget, body.auto_plan)
     report = await _offload(request, "text", services.run_text, request.app.state.backend, body.text, opts)
-    return responses.from_text(report, time.perf_counter() - started)
+    response = responses.from_text(report, time.perf_counter() - started)
+    response.run_plan = opts.chosen_plan
+    return response
 
 
 async def _media(request: Request, kind: str, group: str, file: UploadFile, max_claims: Optional[int],
-                 search_budget: Optional[int], runner: Callable, convert: Callable) -> FactCheckResponse:
+                 search_budget: Optional[int], auto_plan: bool, runner: Callable,
+                 convert: Callable) -> FactCheckResponse:
     started = time.perf_counter()
-    opts = services.Options(max_claims, search_budget)
+    opts = services.Options(max_claims, search_budget, auto_plan)
     async with stored_upload(file, kind, request.app.state.settings) as up:
         # Temporary names never reach the client: the modules mention the file by path or by name.
         replacements = {str(up.path): up.display_name, str(up.directory): "", up.path.name: up.display_name}
         report = await _offload(request, group, runner, request.app.state.backend, up.path, opts, replacements)
-        return convert(report, up.display_name, time.perf_counter() - started, replacements)
-
-
-def _formats(kind: str) -> str:
-    return ", ".join(sorted(EXTENSIONS[kind]))
+        response = convert(report, up.display_name, time.perf_counter() - started, replacements)
+        response.run_plan = opts.chosen_plan
+        return response
 
 
 MaxClaims = Annotated[Optional[int], Form(ge=1, le=12, description="Checkable claims to verify (default 6).")]
 SearchBudget = Annotated[Optional[int], Form(ge=0, le=40, description="Web-search credits for this run (default 40).")]
+AutoPlan = Annotated[bool, Form(description="Let the AI planning agent choose the values not given, after reading "
+                                            "the extracted text.")]
 
 
 @router.post("/api/v1/fact-check/image", response_model=FactCheckResponse, tags=["fact-check"],
@@ -105,11 +177,12 @@ SearchBudget = Annotated[Optional[int], Form(ge=0, le=40, description="Web-searc
 async def fact_check_image(request: Request,
                            file: UploadFile = File(..., description=f"Image ({_formats('image')})."),
                            max_claims: MaxClaims = None,
-                           search_budget: SearchBudget = None) -> FactCheckResponse:
+                           search_budget: SearchBudget = None,
+                           auto_plan: AutoPlan = False) -> FactCheckResponse:
     """OCR the image (RapidOCR) and fact-check the recognised text (`factcheck-ocr --fact-check`). Each claim's
     `provenance` gives its OCR lines, blocks and OCR confidence. Images without readable text return
     `status: not_checked`."""
-    return await _media(request, "image", "image", file, max_claims, search_budget, services.run_image,
+    return await _media(request, "image", "image", file, max_claims, search_budget, auto_plan, services.run_image,
                         responses.from_image)
 
 
@@ -119,13 +192,14 @@ async def fact_check_image(request: Request,
 async def fact_check_video(request: Request,
                            file: UploadFile = File(..., description=f"Video ({_formats('video')})."),
                            max_claims: MaxClaims = None,
-                           search_budget: SearchBudget = None) -> FactCheckResponse:
+                           search_budget: SearchBudget = None,
+                           auto_plan: AutoPlan = False) -> FactCheckResponse:
     """Transcribe the speech (faster-whisper) and read on-screen text (OCR of sampled frames), then fact-check
     both (`factcheck-video`). Each claim's `timestamps` list every place it was spoken or shown (modality, time,
     segment / text-block ids, confidence); `provenance` holds merged duplicates. The full transcript and OCR
     observations are in `report.extraction`. Takes roughly 0.5-1x the video length on a laptop CPU; video and
     audio jobs run one at a time."""
-    return await _media(request, "video", "media", file, max_claims, search_budget, services.run_video,
+    return await _media(request, "video", "media", file, max_claims, search_budget, auto_plan, services.run_video,
                         responses.from_video)
 
 
@@ -135,11 +209,12 @@ async def fact_check_video(request: Request,
 async def fact_check_audio(request: Request,
                            file: UploadFile = File(..., description=f"Audio ({_formats('audio')})."),
                            max_claims: MaxClaims = None,
-                           search_budget: SearchBudget = None) -> FactCheckResponse:
+                           search_budget: SearchBudget = None,
+                           auto_plan: AutoPlan = False) -> FactCheckResponse:
     """Transcribe English speech (faster-whisper, word timestamps) and fact-check it (`factcheck-audio`).
     Each claim's `timestamps` give where it was spoken, its segment ids and transcription confidence. The
     full timed transcript is in `report.transcription.segments`. Non-English audio returns
     `status: not_checked`. Transcription runs at about 0.06x the audio length; video and audio jobs run
     one at a time."""
-    return await _media(request, "audio", "media", file, max_claims, search_budget, services.run_audio,
+    return await _media(request, "audio", "media", file, max_claims, search_budget, auto_plan, services.run_audio,
                         responses.from_audio)

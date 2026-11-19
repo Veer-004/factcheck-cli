@@ -111,6 +111,8 @@ export interface FactCheckResponse {
   warnings: string[];
   notes: string[];
   processing_seconds: number;
+  /** The plan used for this run (server-side AI plan, or attached by the page for text / manual runs). */
+  run_plan?: RunPlan | null;
   report: Record<string, unknown>;
 }
 
@@ -153,4 +155,33 @@ export interface ScreenObservation {
   min_score: number;
   reliable: boolean;
   frame_times: number[];
+}
+
+// ---- run planner (POST /api/v1/plan; see src/factcheck_api/planner.py) ----
+
+export interface RunPlan {
+  mode: "text" | "image" | "video" | "audio";
+  max_claims: number;
+  search_budget: number;
+  estimated_claims: number;
+  estimated_credits: number;
+  basis: "agent" | "text" | "duration" | "typical" | "default";
+  /** agent = the AI planning agent decided; rules = rule-based fallback; manual = set by the user (client-side only). */
+  planner: "agent" | "rules" | "manual";
+  model: string | null;
+  /** For files: the AI agent decides on the server after reading the extracted text; numbers are a preview. */
+  deferred: boolean;
+  statements: string[];
+  credits_left: number | null;
+  credits_limit: number | null;
+  reasons: string[];
+  warnings: string[];
+}
+
+/** Settings sent with a fact-check request (all optional on the server). `auto_plan` lets the server's AI
+ *  planning agent choose the values that are not given. */
+export interface RunOptions {
+  max_claims?: number;
+  search_budget?: number;
+  auto_plan?: boolean;
 }
