@@ -66,7 +66,7 @@ src/
   lib/pdfReport.ts  the downloadable PDF report
     visual/     OceanBackground (canvas particles), Sonar, BrandMark
     layout/     Navbar, Footer
-    ui/         Toast
+    ui/         Toast, AudioPlayer (themed audio player used in the upload preview and the report)
 ```
 
 ## Run settings: rule-based, AI or manual
@@ -101,12 +101,22 @@ estimate was used). It doesn't display the remaining Tavily credits, but every p
   notes). Empty fields are hidden.
 - **Image:** the uploaded image with the OCR line boxes drawn on top (`report.extraction.quality.lines`).
   Hovering a claim highlights the lines it was read from.
-- **Video / audio:** a player for the uploaded file, a timeline of every claim's spoken or on-screen
+- **Video / audio:** a player for the uploaded file (audio uses the themed AudioPlayer: play/pause, waveform, seek bar, ±10 s, speed, volume), a timeline of every claim's spoken or on-screen
   appearances coloured by verdict, the timed transcript (and on-screen text for video) with recognition
   confidence. Clicking a timestamp plays from there.
 - Claims over the per-run limit and claims removed by validation, warnings and notes.
-- **Download PDF report** builds an A4 report in the browser from the same response
-  (`src/lib/pdfReport.ts`, jsPDF loaded only on click). It uses the app's Deep Ocean look: dark pages
+- **Download PDF report** first opens a **Name your report** dialog (`PdfNameDialog.tsx`).
+  - The name is prefilled with a readable default, such as `FactCheck - Video - agni-launch - 20 Nov 2026`,
+    and selected so typing replaces it.
+  - A live preview shows the final file name. Characters that can't be used in file names
+    (`\ / : * ? " < > |`) are removed, a typed `.pdf` isn't doubled, and empty names are refused
+    (`src/lib/pdfName.ts`).
+  - Enter downloads; Esc, Cancel or a click outside closes the dialog.
+  - The chosen name is used for the file and as the PDF's document title, and a toast confirms where it was
+    saved.
+
+  The report is built in the browser from the same response (`src/lib/pdfReport.ts`; jsPDF starts loading
+  when the dialog opens). It uses the app's Deep Ocean look: dark pages
   with a soft teal glow, the brand mark in a running header, glass-style cards and the verdict colours.
   It contains:
   - a cover with the sonar motif, the overall result, the verdict bar and legend, stat cards (claims

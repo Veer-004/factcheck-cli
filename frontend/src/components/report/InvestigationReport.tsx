@@ -2,7 +2,9 @@ import { motion, useReducedMotion } from "framer-motion";
 import { BrainCircuit, AlertTriangle, FileDown, FileSearch, PencilLine, Plus } from "lucide-react";
 import { describePlan } from "../../lib/runPlan";
 import { useToast } from "../ui/Toast";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { suggestedPdfName } from "../../lib/pdfName";
+import { PdfNameDialog } from "./PdfNameDialog";
 import { useObjectUrl } from "../../hooks/useObjectUrl";
 import type { FactCheckResponse } from "../../lib/types";
 import { SUMMARY_COUNT_KEYS, SUMMARY_LABELS, verdictStyle } from "../../lib/verdicts";
@@ -18,13 +20,20 @@ interface Props {
 }
 
 function PdfButton({ result }: { result: FactCheckResponse }) {
+  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const toast = useToast();
-  const onClick = async () => {
+  const defaultName = useMemo(() => suggestedPdfName(result), [result]);
+  // Start loading jsPDF while the user types the name.
+  const preload = () => void import("../../lib/pdfReport");
+
+  const download = async (name: string) => {
     setBusy(true);
     try {
       const { downloadPdfReport } = await import("../../lib/pdfReport");
-      await downloadPdfReport(result);
+      await downloadPdfReport(result, name);
+      setOpen(false);
+      toast("PDF downloaded", `Saved as ${name}.pdf`, "success");
     } catch {
       toast("The PDF couldn't be created", "Please try again. Your report is still shown on this page.");
     } finally {
@@ -32,11 +41,13 @@ function PdfButton({ result }: { result: FactCheckResponse }) {
     }
   };
   return (
-    <button onClick={() => void onClick()} disabled={busy}
-            className="btn btn-glass">
-      {busy ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-teal/30 border-t-teal" /> : <FileDown className="h-4 w-4 text-teal" />}
-      {busy ? "Preparing PDF…" : "Download PDF report"}
-    </button>
+    <>
+      <button onClick={() => { preload(); setOpen(true); }} onMouseEnter={preload} className="btn btn-glass">
+        <FileDown className="h-4 w-4 text-teal" /> Download PDF report
+      </button>
+      <PdfNameDialog open={open} defaultName={defaultName} busy={busy}
+                     onCancel={() => setOpen(false)} onConfirm={(name) => void download(name)} />
+    </>
   );
 }
 

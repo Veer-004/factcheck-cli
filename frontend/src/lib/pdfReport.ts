@@ -3,6 +3,7 @@
 // verdict colours (src/lib/palette.ts). jsPDF is loaded only when the user downloads a report.
 
 import { describePlan } from "./runPlan";
+import { cleanPdfName, suggestedPdfName } from "./pdfName";
 import type { jsPDF as JsPDF } from "jspdf";
 import { domainOf, fmtDate, fmtTime, safeHref, titleCase } from "./format";
 import { hexToRgb, PALETTE } from "./palette";
@@ -624,8 +625,11 @@ export async function buildPdfReport(r: FactCheckResponse): Promise<JsPDF> {
   return doc;
 }
 
-export async function downloadPdfReport(r: FactCheckResponse): Promise<void> {
+/** Build the report and save it as "<name>.pdf" (the name the user chose; a readable default otherwise).
+ *  The name is also the PDF's document title, so viewers show it too. */
+export async function downloadPdfReport(r: FactCheckResponse, name?: string): Promise<void> {
+  const fileName = cleanPdfName(name ?? "") || suggestedPdfName(r);
   const doc = await buildPdfReport(r);
-  const base = (r.filename ?? r.input_type).replace(/\.[^.]+$/, "").replace(/[^\w-]+/g, "-").slice(0, 40) || r.input_type;
-  doc.save(`factcheck-report-${base}-${new Date().toISOString().slice(0, 10)}.pdf`);
+  doc.setProperties({ title: fileName });
+  doc.save(`${fileName}.pdf`);
 }

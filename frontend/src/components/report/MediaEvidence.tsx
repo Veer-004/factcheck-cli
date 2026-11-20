@@ -1,6 +1,7 @@
 import { Mic, MonitorPlay, ScanText } from "lucide-react";
 import { useEffect, useMemo, useState, type RefObject } from "react";
 import { fmtTime } from "../../lib/format";
+import { AudioPlayer } from "../ui/AudioPlayer";
 import { PALETTE } from "../../lib/palette";
 import type { ClaimResult, OcrLine, ScreenObservation, TranscriptSegment } from "../../lib/types";
 import { verdictStyle } from "../../lib/verdicts";
@@ -147,8 +148,7 @@ export function MediaEvidence({ kind, url, mediaRef, duration, claims, segments,
             <video ref={mediaRef as RefObject<HTMLVideoElement>} src={url} controls className="max-h-[26rem] w-full"
                    onLoadedMetadata={(e) => setElDuration(e.currentTarget.duration)} />
           ) : (
-            <audio ref={mediaRef as RefObject<HTMLAudioElement>} src={url} controls className="m-4 w-[calc(100%-2rem)]"
-                   onLoadedMetadata={(e) => setElDuration(e.currentTarget.duration)} />
+            <AudioPlayer src={url} audioRef={mediaRef} onLoadedMetadata={setElDuration} className="!rounded-none !border-0" />
           )}
         </div>
       )}

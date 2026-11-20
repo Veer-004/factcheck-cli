@@ -1,4 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
+import { AudioPlayer } from "../ui/AudioPlayer";
 import { AudioLines, Clapperboard, ImageIcon, RefreshCw, ShieldCheck, Trash2, UploadCloud } from "lucide-react";
 import { useRef, useState, type DragEvent } from "react";
 import { useObjectUrl } from "../../hooks/useObjectUrl";
@@ -102,7 +103,7 @@ export function FileUpload({ mode, file, seconds, onChange, disabled }: Props) {
             <div className="grid place-items-center bg-black/30">
               {url && mode === "image" && <img src={url} alt="Selected image" className="max-h-[22rem] w-auto object-contain" />}
               {url && mode === "video" && <video src={url} controls className="max-h-[22rem] w-full" />}
-              {url && mode === "audio" && <audio src={url} controls className="m-6 w-[calc(100%-3rem)]" />}
+              {url && mode === "audio" && <AudioPlayer src={url} className="m-4 w-[calc(100%-2rem)] sm:m-5 sm:w-[calc(100%-2.5rem)]" />}
             </div>
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-3">
               <div className="min-w-0">

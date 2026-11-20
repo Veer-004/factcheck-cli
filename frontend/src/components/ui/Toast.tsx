@@ -1,28 +1,30 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle, CircleCheck, X } from "lucide-react";
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
 
 interface ToastItem {
   id: number;
   title: string;
   body?: string;
+  tone: ToastTone;
 }
 
-const ToastContext = createContext<(title: string, body?: string) => void>(() => {});
+export type ToastTone = "warning" | "success";
+const ToastContext = createContext<(title: string, body?: string, tone?: ToastTone) => void>(() => {});
 
 export function useToast() {
   return useContext(ToastContext);
 }
 
-/** Small glass notifications for input problems (wrong file type, too large, ...). */
+/** Small glass notifications: problems (wrong file type, too large, ...) and confirmations (PDF saved). */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
   const next = useRef(1);
 
   const dismiss = useCallback((id: number) => setItems((xs) => xs.filter((x) => x.id !== id)), []);
-  const push = useCallback((title: string, body?: string) => {
+  const push = useCallback((title: string, body?: string, tone: ToastTone = "warning") => {
     const id = next.current++;
-    setItems((xs) => [...xs.slice(-2), { id, title, body }]);
+    setItems((xs) => [...xs.slice(-2), { id, title, body, tone }]);
     setTimeout(() => dismiss(id), 6000);
   }, [dismiss]);
 
@@ -40,7 +42,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               className="pointer-events-auto flex w-full max-w-md items-start gap-3 rounded-xl px-4 py-3 glass-strong"
               role="status"
             >
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warn" />
+              {t.tone === "success" ? <CircleCheck className="mt-0.5 h-4 w-4 shrink-0 text-teal" />
+                : <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warn" />}
               <div className="flex-1 text-sm">
                 <p className="font-semibold">{t.title}</p>
                 {t.body && <p className="mt-0.5 text-muted">{t.body}</p>}
